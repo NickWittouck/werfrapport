@@ -1,0 +1,765 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f4e79">
+<title>Werfrapport</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+:root{--bg:#f3f5f8;--card:#fff;--ink:#1b2430;--muted:#667085;--line:#d9dee6;--acc:#1f4e79;--acc2:#e8f0f8;--ok:#1a7f37;--warn:#b54708;--del:#b42318}
+@media (prefers-color-scheme:dark){:root{--bg:#11161d;--card:#1a212b;--ink:#e6ebf1;--muted:#98a2b3;--line:#2c3644;--acc:#5b9bd5;--acc2:#1d2b3a;--ok:#4ac26b;--warn:#f79009;--del:#f97066}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:84px}
+header{position:sticky;top:0;z-index:5;background:var(--acc);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:8px}
+header h1{font-size:18px;margin:0;flex:1}
+#saveState{font-size:13px;opacity:.9}
+main{max-width:820px;margin:0 auto;padding:12px 16px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);z-index:5;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;background:none;color:var(--muted);padding:10px 4px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav button span{font-size:20px}
+nav button.on{color:var(--acc);font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.card h2{font-size:16px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.card h2 .grow{flex:1}
+label{display:block;font-size:13px;color:var(--muted);margin:8px 0 4px}
+input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px}
+textarea{min-height:64px;resize:vertical}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:10px 14px;font:inherit;font-weight:500;cursor:pointer}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn.sm{padding:6px 10px;font-size:14px}
+.btn.del{color:var(--del)}
+.btn.block{width:100%;margin-top:8px}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.line,.lhead{display:grid;grid-template-columns:1.1fr 96px 96px 64px 64px 1.5fr 30px;gap:6px;align-items:end}
+.line{margin-bottom:6px}
+.lhead{font-size:12px;color:var(--muted)}
+.line input{padding:9px 6px}
+.line .x{border:0;background:none;color:var(--del);font-size:20px;padding:8px 0;cursor:pointer}
+.line .mini{margin:0;font-size:11px}
+.line .mini span{display:none}
+.line.l3{grid-template-columns:1.6fr 90px 2fr 30px}
+.lhead.l3{grid-template-columns:1.6fr 90px 2fr 30px}
+@media (max-width:640px){
+ .line{grid-template-columns:1fr 1fr 72px 30px;grid-template-areas:"n n u x" "b e p p" "t t t t";padding-bottom:8px;border-bottom:1px dashed var(--line)}
+ .line .n{grid-area:n}.line .u{grid-area:u}.line .t{grid-area:t}.line .x{grid-area:x}
+ .line .b{grid-area:b}.line .e{grid-area:e}.line .p{grid-area:p}
+ .line .mini span{display:block}
+ .line.l3{grid-template-columns:1fr 80px 30px;grid-template-areas:"n u x" "t t t"}
+ .lhead{display:none}
+}
+#logo{height:30px;max-width:110px;object-fit:contain;background:#fff;border-radius:6px;padding:2px}
+#logoPrev{max-height:60px;max-width:200px;display:block;margin:6px 0}
+.tot{font-weight:600;color:var(--acc)}
+.muted{color:var(--muted);font-size:14px}
+.hist{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.hist:last-child{border-bottom:0}
+.hist .d{font-weight:600;min-width:96px}
+.hist .w{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge{font-size:12px;border-radius:99px;padding:2px 8px;background:var(--acc2);color:var(--acc);white-space:nowrap}
+.badge.ok{color:var(--ok)}
+.badge.warn{color:var(--warn)}
+.chip{display:inline-flex;align-items:center;gap:4px;background:var(--acc2);border-radius:99px;padding:4px 10px;margin:3px;font-size:14px}
+.chip button{border:0;background:none;color:var(--del);cursor:pointer;font-size:16px;padding:0}
+.hidden{display:none!important}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;z-index:20;max-width:90vw;text-align:center}
+.warnbox{border-left:4px solid var(--warn)}
+</style>
+</head>
+<body>
+<header><img id="logo" class="hidden" alt=""><h1 id="title">Werfrapport</h1><span id="saveState"></span></header>
+<main>
+
+<!-- ===== RAPPORT ===== -->
+<section id="v-rapport">
+ <div class="card">
+  <div class="row2">
+   <div><label>Datum</label><input type="date" id="r-datum"></div>
+   <div><label>Werf</label><input id="r-werf" list="dl-werven" placeholder="Naam werf"></div>
+  </div>
+  <label>Weer / omstandigheden</label><input id="r-weer" placeholder="bv. droog, 14°C">
+ </div>
+ <div id="ploegen"></div>
+ <div class="card">
+  <label>Ploeg toevoegen</label>
+  <div style="display:flex;gap:8px"><select id="addPloegSel"></select><button class="btn pri" id="addPloegBtn">+</button></div>
+ </div>
+ <div class="card">
+  <h2><span class="grow">🚜 Materieel</span><span class="tot" id="mat-tot"></span></h2>
+  <div class="lhead l3"><span>Materieel / machine</span><span>Uren</span><span>Opmerking</span><span></span></div>
+  <div id="matRows"></div>
+  <button class="btn sm" id="addMat">+ Materieel</button>
+ </div>
+ <div class="card">
+  <h2><span class="grow">🚐 Verplaatsingen / kilometers</span><span class="tot" id="km-tot"></span></h2>
+  <div class="lhead l3"><span>Voertuig / chauffeur</span><span>Km</span><span>Traject</span><span></span></div>
+  <div id="kmRows"></div>
+  <button class="btn sm" id="addKm">+ Verplaatsing</button>
+ </div>
+ <div class="card">
+  <label>Algemene opmerkingen (leveringen, problemen, bezoekers…)</label>
+  <textarea id="r-opm"></textarea>
+  <p>Totaal uren vandaag: <span class="tot" id="r-tot">0</span></p>
+  <button class="btn pri block" id="mailBtn">✉️ Mail als Excel</button>
+  <button class="btn block" id="dlBtn">⬇️ Excel downloaden</button>
+  <p class="muted" id="r-sent"></p>
+ </div>
+ <button class="btn block" id="newBtn">＋ Nieuw rapport</button>
+ <button class="btn block" id="copyBtn">⧉ Nieuw rapport op basis van dit rapport (ploegen + namen)</button>
+</section>
+
+<!-- ===== HISTORIEK ===== -->
+<section id="v-hist" class="hidden">
+ <div class="card">
+  <h2>Overzicht periode naar Excel</h2>
+  <div class="row2">
+   <div><label>Van</label><input type="date" id="p-van"></div>
+   <div><label>Tot en met</label><input type="date" id="p-tot"></div>
+  </div>
+  <label>Werf (leeg = alle)</label><input id="p-werf" list="dl-werven">
+  <div class="btns"><button class="btn pri" id="pMail">✉️ Mailen</button><button class="btn" id="pDl">⬇️ Downloaden</button></div>
+ </div>
+ <div class="card">
+  <h2><span class="grow">Alle rapporten</span><label style="margin:0;display:flex;gap:4px;align-items:center"><input type="checkbox" id="showDel" style="width:auto"> prullenbak</label></h2>
+  <input id="h-zoek" placeholder="Zoeken op werf, naam, taak…">
+  <div id="histList"></div>
+ </div>
+</section>
+
+<!-- ===== INSTELLINGEN ===== -->
+<section id="v-inst" class="hidden">
+ <div class="card">
+  <h2>Gegevens</h2>
+  <label>Naam werfleider</label><input id="s-naam">
+  <label>Bedrijf</label><input id="s-bedrijf">
+  <label>Mail rapport naar (meerdere: scheiden met ;)</label><input id="s-mail" type="email" multiple>
+  <label>CC</label><input id="s-cc" type="email" multiple>
+  <label>Logo (verschijnt bovenaan de app)</label>
+  <img id="logoPrev" class="hidden" alt="">
+  <div class="btns" style="margin-top:0"><button class="btn sm" id="logoBtn">🖼 Logo kiezen</button><button class="btn sm del" id="logoDel">Logo wissen</button></div>
+  <input type="file" id="logoFile" accept="image/*" class="hidden">
+ </div>
+ <div class="card">
+  <h2>Standaard werkuren</h2>
+  <p class="muted" style="margin:0">Worden ingevuld bij nieuwe personen; uren worden automatisch berekend (einde − begin − pauze).</p>
+  <div class="row2">
+   <div><label>Begin</label><input type="time" id="s-begin"></div>
+   <div><label>Einde</label><input type="time" id="s-einde"></div>
+  </div>
+  <label>Pauze (minuten)</label><input id="s-pauze" inputmode="numeric">
+ </div>
+ <div class="card">
+  <h2>Materieel &amp; voertuigen (keuzelijsten)</h2>
+  <label>Materieel</label><div id="s-materieel"></div>
+  <div style="display:flex;gap:8px;margin-top:8px"><input id="s-newMat" placeholder="bv. Kraan 25T, minigraver"><button class="btn pri" id="s-addMat">+</button></div>
+  <label>Voertuigen</label><div id="s-voertuigen"></div>
+  <div style="display:flex;gap:8px;margin-top:8px"><input id="s-newVoer" placeholder="bv. Camionette 1-ABC-123"><button class="btn pri" id="s-addVoer">+</button></div>
+ </div>
+ <div class="card">
+  <h2>Ploegen &amp; leden</h2>
+  <div id="s-ploegen"></div>
+  <div style="display:flex;gap:8px;margin-top:8px"><input id="s-newPloeg" placeholder="Nieuwe ploeg"><button class="btn pri" id="s-addPloeg">+</button></div>
+ </div>
+ <div class="card">
+  <h2>Werven</h2>
+  <div id="s-werven"></div>
+  <div style="display:flex;gap:8px;margin-top:8px"><input id="s-newWerf" placeholder="Nieuwe werf"><button class="btn pri" id="s-addWerf">+</button></div>
+ </div>
+ <div class="card" id="backupCard">
+  <h2>Veiligheid van je gegevens</h2>
+  <p class="muted" id="persistInfo"></p>
+  <p class="muted" id="backupInfo"></p>
+  <div class="btns">
+   <button class="btn pri" id="bkDl">💾 Volledige backup bewaren</button>
+   <button class="btn" id="bkShare">✉️ Backup mailen</button>
+   <button class="btn" id="bkImp">📂 Backup terugzetten</button>
+  </div>
+  <input type="file" id="bkFile" accept=".json,application/json" class="hidden">
+ </div>
+</section>
+</main>
+
+<nav>
+ <button data-v="rapport" class="on"><span>📝</span>Rapport</button>
+ <button data-v="hist"><span>📚</span>Historiek</button>
+ <button data-v="inst"><span>⚙️</span>Instellingen</button>
+</nav>
+<datalist id="dl-werven"></datalist>
+<datalist id="dl-namen"></datalist>
+<datalist id="dl-mat"></datalist>
+<datalist id="dl-voer"></datalist>
+
+<script>
+"use strict";
+/* ================= OPSLAG (IndexedDB + spiegel in localStorage) ================= */
+const DB_NAME = "werfrapport", DB_VER = 1;
+let db;
+function openDB(){
+  return new Promise((res, rej) => {
+    const rq = indexedDB.open(DB_NAME, DB_VER);
+    rq.onupgradeneeded = () => {
+      const d = rq.result;
+      if (!d.objectStoreNames.contains("rapporten")) d.createObjectStore("rapporten", { keyPath: "id" });
+      if (!d.objectStoreNames.contains("kv")) d.createObjectStore("kv");
+    };
+    rq.onsuccess = () => res(rq.result);
+    rq.onerror = () => rej(rq.error);
+  });
+}
+function tx(store, mode, fn){
+  return new Promise((res, rej) => {
+    const t = db.transaction(store, mode), s = t.objectStore(store);
+    const r = fn(s);
+    t.oncomplete = () => res(r && r.result);
+    t.onerror = () => rej(t.error);
+  });
+}
+const dbPut = r => tx("rapporten", "readwrite", s => s.put(r));
+const dbAll = () => tx("rapporten", "readonly", s => s.getAll());
+const kvGet = k => tx("kv", "readonly", s => s.get(k));
+const kvSet = (k, v) => tx("kv", "readwrite", s => s.put(v, k));
+
+// Extra kopie in localStorage: als één opslag wegvalt, blijft de andere.
+function mirror(key, val){ try { localStorage.setItem("wr_" + key, JSON.stringify(val)); } catch(e){} }
+function mirrorGet(key){ try { return JSON.parse(localStorage.getItem("wr_" + key)); } catch(e){ return null; } }
+
+/* ================= STATE ================= */
+let S = { naam:"", bedrijf:"NitoCon", mail:"", cc:"", ploegen:[], werven:[], logo:"", begin:"", einde:"", pauze:"", materieel:[], voertuigen:[] };
+let R = null;          // huidig rapport
+let ALL = [];          // alle rapporten
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+const fmtD = iso => { const [y,m,d] = iso.split("-"); return `${d}/${m}/${y}`; };
+const dag = iso => ["zo","ma","di","wo","do","vr","za"][new Date(iso + "T12:00").getDay()];
+const num = v => { const n = parseFloat(String(v).replace(",", ".")); return isNaN(n) ? 0 : n; };
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+const $ = id => document.getElementById(id);
+
+function toast(msg, ms = 2600){
+  const t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), ms);
+}
+
+// Uren = einde − begin − pauze (over middernacht kan ook)
+function calcUren(r){
+  if (!r.begin || !r.einde) return null;
+  const m = t => { const [h, mi] = t.split(":").map(Number); return h * 60 + mi; };
+  let d = m(r.einde) - m(r.begin); if (d < 0) d += 1440;
+  d -= num(r.pauze);
+  return Math.max(0, Math.round(d / 60 * 100) / 100);
+}
+function newRow(naam = ""){
+  const r = { naam, begin: S.begin || "", einde: S.einde || "", pauze: S.pauze || "", uren: "", taak: "" };
+  const u = calcUren(r); if (u !== null) r.uren = String(u);
+  return r;
+}
+function newReport(base){
+  return {
+    id: uid(), datum: today(), werf: base ? base.werf : (S.werven[0] || ""), weer: "", opm: "",
+    ploegen: base ? base.ploegen.map(p => ({ naam: p.naam, taak: "", rijen: p.rijen.map(r => ({ naam: r.naam, begin: r.begin || "", einde: r.einde || "", pauze: r.pauze || "", uren: r.uren, taak: "" })) })) : [],
+    mat: base ? (base.mat || []).map(x => ({ naam: x.naam, uren: "", opm: "" })) : [],
+    km: base ? (base.km || []).map(x => ({ naam: x.naam, km: x.km, opm: x.opm })) : [],
+    verzonden: [], aangemaakt: new Date().toISOString(), gewijzigd: new Date().toISOString(), verwijderd: false
+  };
+}
+
+/* ================= OPSLAAN ================= */
+let saveTimer;
+function saveSoon(){
+  $("saveState").textContent = "…";
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, 400);
+}
+async function saveNow(){
+  clearTimeout(saveTimer);
+  if (!R) return;
+  R.gewijzigd = new Date().toISOString();
+  await dbPut(R);
+  const i = ALL.findIndex(x => x.id === R.id); if (i < 0) ALL.push(R); else ALL[i] = R;
+  mirror("rapporten", ALL);
+  await kvSet("laatste", R.id);
+  $("saveState").textContent = "Opgeslagen ✓";
+}
+async function saveSettings(){
+  await kvSet("settings", S); mirror("settings", S); fillLists();
+}
+
+/* ================= RAPPORT UI ================= */
+function bindField(id, key){
+  $(id).addEventListener("input", e => { R[key] = e.target.value; saveSoon(); if (key === "werf") $("title").textContent = R.werf || "Werfrapport"; });
+}
+function renderReport(){
+  $("r-datum").value = R.datum; $("r-werf").value = R.werf; $("r-weer").value = R.weer; $("r-opm").value = R.opm;
+  $("title").textContent = R.werf || "Werfrapport";
+  const box = $("ploegen"); box.innerHTML = "";
+  R.ploegen.forEach((p, pi) => {
+    const c = document.createElement("div"); c.className = "card";
+    c.innerHTML = `<h2><span class="grow">👷 ${esc(p.naam)}</span><span class="tot" data-pt="${pi}"></span>
+      <button class="btn sm del" data-delp="${pi}">Verwijder</button></h2>
+      <div class="lhead"><span>Naam</span><span>Begin</span><span>Einde</span><span>Pauze (min)</span><span>Uren</span><span>Taak</span><span></span></div>
+      <div data-rows="${pi}"></div>
+      <div class="btns"><button class="btn sm" data-addr="${pi}">+ Persoon</button>
+      <button class="btn sm" data-alle="${pi}">+ Alle leden</button>
+      <button class="btn sm" data-uren="${pi}">Tijden 1e persoon → iedereen</button></div>
+      <label>Taken / werkzaamheden ploeg</label><textarea data-ptaak="${pi}">${esc(p.taak)}</textarea>`;
+    box.appendChild(c);
+    renderRows(pi);
+  });
+  renderList("mat", "matRows", MAT); renderList("km", "kmRows", KM);
+  fillPloegSel(); totals(); sentInfo();
+}
+function renderRows(pi){
+  const wrap = document.querySelector(`[data-rows="${pi}"]`); wrap.innerHTML = "";
+  R.ploegen[pi].rijen.forEach((r, ri) => {
+    const d = document.createElement("div"); d.className = "line";
+    d.innerHTML = `<input class="n" list="dl-namen" placeholder="Naam" value="${esc(r.naam)}" data-f="naam">
+      <label class="mini b"><span>Begin</span><input type="time" value="${esc(r.begin)}" data-f="begin"></label>
+      <label class="mini e"><span>Einde</span><input type="time" value="${esc(r.einde)}" data-f="einde"></label>
+      <label class="mini p"><span>Pauze (min)</span><input inputmode="numeric" placeholder="min" value="${esc(r.pauze)}" data-f="pauze"></label>
+      <label class="mini u"><span>Uren</span><input inputmode="decimal" placeholder="u" value="${esc(r.uren)}" data-f="uren"></label>
+      <input class="t" placeholder="Taak" value="${esc(r.taak)}" data-f="taak">
+      <button class="x" title="Verwijder">×</button>`;
+    const uIn = d.querySelector('[data-f="uren"]');
+    d.querySelectorAll("input").forEach(inp => inp.addEventListener("input", () => {
+      const f = inp.dataset.f; r[f] = inp.value;
+      if (["begin","einde","pauze"].includes(f)){ const u = calcUren(r); if (u !== null){ r.uren = String(u); uIn.value = r.uren; } }
+      saveSoon(); if (["uren","begin","einde","pauze"].includes(f)) totals();
+    }));
+    d.querySelector(".x").onclick = () => { R.ploegen[pi].rijen.splice(ri, 1); renderRows(pi); totals(); saveSoon(); };
+    wrap.appendChild(d);
+  });
+}
+function totals(){
+  let t = 0;
+  R.ploegen.forEach((p, pi) => {
+    const s = p.rijen.reduce((a, r) => a + num(r.uren), 0); t += s;
+    const el = document.querySelector(`[data-pt="${pi}"]`); if (el) el.textContent = s ? s + " u" : "";
+  });
+  $("r-tot").textContent = t + " u";
+  const mt = (R.mat || []).reduce((a, x) => a + num(x.uren), 0), kt = (R.km || []).reduce((a, x) => a + num(x.km), 0);
+  $("mat-tot").textContent = mt ? mt + " u" : ""; $("km-tot").textContent = kt ? kt + " km" : "";
+}
+// Materieel en kilometers: zelfde eenvoudige lijst met 3 velden
+function renderList(key, box, ph){
+  R[key] = R[key] || [];
+  const wrap = $(box); wrap.innerHTML = "";
+  R[key].forEach((x, i) => {
+    const d = document.createElement("div"); d.className = "line l3";
+    d.innerHTML = `<input class="n" list="${ph.list}" placeholder="${ph.n}" value="${esc(x.naam)}" data-f="naam">
+      <input class="u" inputmode="decimal" placeholder="${ph.u}" value="${esc(x[ph.uf])}" data-f="${ph.uf}">
+      <input class="t" placeholder="${ph.t}" value="${esc(x.opm)}" data-f="opm">
+      <button class="x" title="Verwijder">×</button>`;
+    d.querySelectorAll("input").forEach(inp => inp.addEventListener("input", () => { x[inp.dataset.f] = inp.value; saveSoon(); totals(); }));
+    d.querySelector(".x").onclick = () => { R[key].splice(i, 1); renderList(key, box, ph); totals(); saveSoon(); };
+    wrap.appendChild(d);
+  });
+}
+const MAT = { list:"dl-mat", n:"Materieel", u:"u", uf:"uren", t:"Opmerking" };
+const KM = { list:"dl-voer", n:"Voertuig / chauffeur", u:"km", uf:"km", t:"Traject (bv. depot → werf → depot)" };
+$("addMat").onclick = () => { (R.mat = R.mat || []).push({ naam:"", uren:"", opm:"" }); renderList("mat", "matRows", MAT); saveSoon(); };
+$("addKm").onclick = () => { (R.km = R.km || []).push({ naam:"", km:"", opm:"" }); renderList("km", "kmRows", KM); saveSoon(); };
+function sentInfo(){
+  $("r-sent").textContent = R.verzonden.length
+    ? "Laatst verzonden: " + new Date(R.verzonden[R.verzonden.length - 1]).toLocaleString("nl-BE") + (R.gewijzigd > R.verzonden[R.verzonden.length - 1] ? " — daarna nog gewijzigd" : "")
+    : "Nog niet verzonden.";
+}
+function fillPloegSel(){
+  const used = R.ploegen.map(p => p.naam);
+  const opts = S.ploegen.filter(p => !used.includes(p.naam)).map(p => `<option>${esc(p.naam)}</option>`).join("");
+  $("addPloegSel").innerHTML = opts + `<option value="__nieuw">Andere ploeg…</option>`;
+}
+$("ploegen").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.addr !== undefined){ const pi = +b.dataset.addr; R.ploegen[pi].rijen.push(newRow()); renderRows(pi); totals(); saveSoon();
+    const ins = document.querySelectorAll(`[data-rows="${pi}"] .n`); ins[ins.length - 1].focus(); }
+  if (b.dataset.alle !== undefined){ const pi = +b.dataset.alle, p = R.ploegen[pi];
+    const def = S.ploegen.find(x => x.naam === p.naam);
+    if (!def || !def.leden.length) return toast("Geen leden ingesteld voor deze ploeg (zie Instellingen).");
+    def.leden.forEach(n => { if (!p.rijen.some(r => r.naam === n)) p.rijen.push(newRow(n)); });
+    renderRows(pi); totals(); saveSoon(); }
+  if (b.dataset.uren !== undefined){ const pi = +b.dataset.uren, rij = R.ploegen[pi].rijen, f = rij[0];
+    if (!f) return;
+    if (!confirm(`Begin ${f.begin || "–"}, einde ${f.einde || "–"}, pauze ${f.pauze || 0} min, ${f.uren || 0} u overnemen voor de hele ploeg?`)) return;
+    rij.forEach(r => { r.begin = f.begin; r.einde = f.einde; r.pauze = f.pauze; r.uren = f.uren; }); renderRows(pi); totals(); saveSoon(); }
+  if (b.dataset.delp !== undefined){ const pi = +b.dataset.delp;
+    if (!confirm(`Ploeg "${R.ploegen[pi].naam}" uit dit rapport verwijderen?`)) return;
+    R.ploegen.splice(pi, 1); renderReport(); saveSoon(); }
+});
+$("ploegen").addEventListener("input", e => {
+  if (e.target.dataset.ptaak !== undefined){ R.ploegen[+e.target.dataset.ptaak].taak = e.target.value; saveSoon(); }
+});
+$("addPloegBtn").onclick = () => {
+  let n = $("addPloegSel").value;
+  if (n === "__nieuw"){ n = prompt("Naam van de ploeg:"); if (!n) return; n = n.trim();
+    if (!S.ploegen.some(p => p.naam === n)){ S.ploegen.push({ naam:n, leden:[] }); saveSettings(); } }
+  const def = S.ploegen.find(p => p.naam === n);
+  R.ploegen.push({ naam:n, taak:"", rijen: def && def.leden.length ? def.leden.map(l => newRow(l)) : [newRow()] });
+  renderReport(); saveSoon();
+};
+bindField("r-datum", "datum"); bindField("r-werf", "werf"); bindField("r-weer", "weer"); bindField("r-opm", "opm");
+$("newBtn").onclick = async () => { await saveNow(); R = newReport(); await saveNow(); renderReport(); toast("Nieuw rapport gestart"); };
+$("copyBtn").onclick = async () => { await saveNow(); R = newReport(R); await saveNow(); renderReport(); toast("Nieuw rapport met dezelfde ploegen"); };
+
+/* ================= XLSX-SCHRIJVER (zonder externe bibliotheek, werkt offline) ================= */
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++){ let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = b => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+function zip(files){ // files: [{name, data(string)}] -> Uint8Array (opslaan zonder compressie)
+  const enc = new TextEncoder(), parts = [], cd = []; let off = 0;
+  for (const f of files){
+    const name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true);
+    h.setUint16(10, 0, true); h.setUint16(12, 0x21, true); h.setUint32(14, crc, true);
+    h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true); h.setUint16(28, 0, true);
+    parts.push(new Uint8Array(h.buffer), name, data);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true);
+    c.setUint16(10, 0, true); c.setUint16(12, 0, true); c.setUint16(14, 0x21, true); c.setUint32(16, crc, true);
+    c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true);
+    c.setUint32(42, off, true);
+    cd.push(new Uint8Array(c.buffer), name);
+    off += 30 + name.length + data.length;
+  }
+  const cdSize = cd.reduce((a, p) => a + p.length, 0);
+  const e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true);
+  e.setUint32(12, cdSize, true); e.setUint32(16, off, true);
+  const all = [...parts, ...cd, new Uint8Array(e.buffer)], out = new Uint8Array(all.reduce((a, p) => a + p.length, 0));
+  let p = 0; for (const a of all){ out.set(a, p); p += a.length; } return out;
+}
+const xe = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c])).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+const col = i => { let s = ""; i++; while (i){ const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
+// stijlen: 0 normaal, 1 vet, 2 kop (vet+vulling+rand), 3 getal, 4 vet getal, 5 tekst met rand+terugloop, 6 titel, 7 getal met rand, 8 datum-tekst rand
+function sheetXML(rows, widths, merges = []){
+  let x = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">`;
+  x += `<cols>` + widths.map((w, i) => `<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("") + `</cols><sheetData>`;
+  rows.forEach((row, ri) => {
+    x += `<row r="${ri+1}">`;
+    (row || []).forEach((c, ci) => {
+      if (c == null) return;
+      if (typeof c !== "object") c = { v: c };
+      const ref = col(ci) + (ri + 1), s = c.s ? ` s="${c.s}"` : "";
+      if (c.f) x += `<c r="${ref}"${s}><f>${xe(c.f)}</f></c>`;
+      else if (typeof c.v === "number") x += `<c r="${ref}"${s}><v>${c.v}</v></c>`;
+      else if (c.v === "" || c.v == null) x += `<c r="${ref}"${s}/>`;
+      else x += `<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${xe(c.v)}</t></is></c>`;
+    });
+    x += `</row>`;
+  });
+  x += `</sheetData>`;
+  if (merges.length) x += `<mergeCells count="${merges.length}">` + merges.map(m => `<mergeCell ref="${m}"/>`).join("") + `</mergeCells>`;
+  x += `<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  return x;
+}
+function buildXlsx(sheets){ // [{name, rows, widths, merges}]
+  const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="1"><numFmt numFmtId="164" formatCode="0.00"/></numFmts>
+<fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="15"/><color rgb="FF1F4E79"/><name val="Calibri"/></font></fonts>
+<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDDEBF7"/><bgColor indexed="64"/></patternFill></fill></fills>
+<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFB4B4B4"/></left><right style="thin"><color rgb="FFB4B4B4"/></right><top style="thin"><color rgb="FFB4B4B4"/></top><bottom style="thin"><color rgb="FFB4B4B4"/></bottom><diagonal/></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="9">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>
+<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="164" fontId="1" fillId="2" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment vertical="top"/></xf>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+</cellXfs></styleSheet>`;
+  const files = [
+    { name:"[Content_Types].xml", data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>` +
+      sheets.map((s, i) => `<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("") + `</Types>` },
+    { name:"_rels/.rels", data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>` },
+    { name:"xl/workbook.xml", data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>` +
+      sheets.map((s, i) => `<sheet name="${xe(s.name.replace(/[\\\/\?\*\[\]:]/g, "-").slice(0, 31))}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join("") + `</sheets></workbook>` },
+    { name:"xl/_rels/workbook.xml.rels", data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+      sheets.map((s, i) => `<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join("") +
+      `<Relationship Id="rId${sheets.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
+    { name:"xl/styles.xml", data:styles },
+    ...sheets.map((s, i) => ({ name:`xl/worksheets/sheet${i+1}.xml`, data:sheetXML(s.rows, s.widths, s.merges) }))
+  ];
+  return new Blob([zip(files)], { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+}
+
+/* ================= EXCEL-INHOUD ================= */
+function dagSheet(r){
+  const rows = [], merges = [];
+  const H = t => ({ v:t, s:2 }), B = v => ({ v, s:5 }), E = { v:"", s:2 };
+  rows.push([{ v:(S.bedrijf ? S.bedrijf + " – " : "") + "Dagrapport werf", s:6 }]);
+  rows.push([{ v:"Datum", s:1 }, `${dag(r.datum)} ${fmtD(r.datum)}`]);
+  rows.push([{ v:"Werf", s:1 }, r.werf]);
+  rows.push([{ v:"Werfleider", s:1 }, S.naam]);
+  if (r.weer) rows.push([{ v:"Weer", s:1 }, r.weer]);
+  rows.push([]);
+  rows.push([H("Ploeg"), H("Naam"), H("Begin"), H("Einde"), H("Pauze (min)"), H("Uren"), H("Taak / werkzaamheden")]);
+  const subRefs = [];
+  r.ploegen.forEach(p => {
+    const rij = p.rijen.filter(x => x.naam || num(x.uren) || x.taak);
+    const start = rows.length + 1;
+    rij.forEach(x => rows.push([B(p.naam), B(x.naam), B(x.begin || ""), B(x.einde || ""), x.pauze !== "" && x.pauze != null ? { v:num(x.pauze), s:5 } : B(""), { v:num(x.uren), s:7 }, B(x.taak || p.taak || "")]));
+    if (!rij.length) rows.push([B(p.naam), B(""), B(""), B(""), B(""), { v:0, s:7 }, B("")]);
+    const end = rows.length;
+    rows.push([H("Subtotaal " + p.naam), E, E, E, E, { f:`SUM(F${start}:F${end})`, s:4 }, H(p.taak ? "Ploegtaken: " + p.taak : "")]);
+    subRefs.push("F" + rows.length);
+  });
+  rows.push([]);
+  rows.push([H("TOTAAL UREN PERSONEEL"), E, E, E, E, { f: subRefs.length ? subRefs.join("+") : "0", s:4 }, E]);
+  const mat = (r.mat || []).filter(x => x.naam || num(x.uren));
+  if (mat.length){
+    rows.push([]); rows.push([H("Materieel"), E, E, E, E, H("Uren"), H("Opmerking")]);
+    const s0 = rows.length + 1;
+    mat.forEach(x => { rows.push([B(x.naam), B(""), B(""), B(""), B(""), { v:num(x.uren), s:7 }, B(x.opm || "")]); merges.push(`A${rows.length}:E${rows.length}`); });
+    rows.push([H("Totaal materieel"), E, E, E, E, { f:`SUM(F${s0}:F${rows.length})`, s:4 }, E]);
+  }
+  const km = (r.km || []).filter(x => x.naam || num(x.km));
+  if (km.length){
+    rows.push([]); rows.push([H("Verplaatsingen"), E, E, E, E, H("Km"), H("Traject")]);
+    const s0 = rows.length + 1;
+    km.forEach(x => { rows.push([B(x.naam), B(""), B(""), B(""), B(""), { v:num(x.km), s:7 }, B(x.opm || "")]); merges.push(`A${rows.length}:E${rows.length}`); });
+    rows.push([H("Totaal km"), E, E, E, E, { f:`SUM(F${s0}:F${rows.length})`, s:4 }, E]);
+  }
+  if (r.opm){ rows.push([]); rows.push([{ v:"Opmerkingen", s:1 }]); rows.push([{ v:r.opm, s:8 }]); merges.push(`A${rows.length}:G${rows.length}`); }
+  return { name: fmtD(r.datum).replace(/\//g, "-"), rows, widths:[18, 22, 8, 8, 8, 8, 50], merges };
+}
+function periodeSheets(list){
+  const H = t => ({ v:t, s:2 }), E = { v:"", s:2 };
+  const rows = [[H("Datum"), H("Dag"), H("Werf"), H("Ploeg"), H("Naam"), H("Begin"), H("Einde"), H("Pauze (min)"), H("Uren"), H("Taak")]];
+  const perPers = {}, matR = [[H("Datum"), H("Werf"), H("Materieel"), H("Uren"), H("Opmerking")]], kmR = [[H("Datum"), H("Werf"), H("Voertuig / chauffeur"), H("Km"), H("Traject")]];
+  list.forEach(r => {
+    r.ploegen.forEach(p => p.rijen.filter(x => x.naam || num(x.uren)).forEach(x => {
+      rows.push([fmtD(r.datum), dag(r.datum), r.werf, p.naam, x.naam, x.begin || "", x.einde || "", x.pauze !== "" && x.pauze != null ? num(x.pauze) : "", { v:num(x.uren), s:3 }, x.taak || p.taak || ""]);
+      const k = x.naam || "(zonder naam)"; perPers[k] = perPers[k] || { ploeg:p.naam, uren:0, dagen:new Set() };
+      perPers[k].uren += num(x.uren); perPers[k].dagen.add(r.datum);
+    }));
+    (r.mat || []).filter(x => x.naam || num(x.uren)).forEach(x => matR.push([fmtD(r.datum), r.werf, x.naam, { v:num(x.uren), s:3 }, x.opm || ""]));
+    (r.km || []).filter(x => x.naam || num(x.km)).forEach(x => kmR.push([fmtD(r.datum), r.werf, x.naam, { v:num(x.km), s:3 }, x.opm || ""]));
+  });
+  rows.push([]); rows.push([H("TOTAAL"), E, E, E, E, E, E, E, { f:`SUM(I2:I${rows.length - 1})`, s:4 }, E]);
+  const tot = [[H("Naam"), H("Ploeg"), H("Dagen"), H("Uren")]];
+  Object.keys(perPers).sort().forEach(k => tot.push([k, perPers[k].ploeg, perPers[k].dagen.size, { v:perPers[k].uren, s:3 }]));
+  tot.push([H("TOTAAL"), E, E, { f:`SUM(D2:D${tot.length})`, s:4 }]);
+  const extra = [];
+  if (matR.length > 1){ matR.push([H("TOTAAL"), E, E, { f:`SUM(D2:D${matR.length})`, s:4 }, E]); extra.push({ name:"Materieel", rows:matR, widths:[12, 22, 28, 9, 40] }); }
+  if (kmR.length > 1){ kmR.push([H("TOTAAL"), E, E, { f:`SUM(D2:D${kmR.length})`, s:4 }, E]); extra.push({ name:"Kilometers", rows:kmR, widths:[12, 22, 28, 9, 40] }); }
+  return [
+    { name:"Alle uren", rows, widths:[12, 6, 22, 16, 22, 8, 8, 8, 8, 50] },
+    { name:"Totaal per persoon", rows:tot, widths:[24, 18, 8, 10] },
+    ...extra,
+    ...list.map(dagSheet).map((s, i) => ({ ...s, name: (s.name + " " + (list[i].werf || "")).slice(0, 31) }))
+  ];
+}
+
+/* ================= DELEN / MAILEN ================= */
+function download(blob, name){
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+async function shareOrMail(blob, name, subject, body){
+  const file = new File([blob], name, { type: blob.type });
+  if (navigator.canShare && navigator.canShare({ files:[file] })){
+    try { await navigator.share({ files:[file], title:subject, text:body }); return true; }
+    catch(e){ if (e.name === "AbortError") return false; }
+  }
+  // Terugval (bv. pc): bestand downloaden en mailprogramma openen; bijlage zelf toevoegen.
+  download(blob, name);
+  const to = (S.mail || "").replace(/;/g, ","), cc = (S.cc || "").replace(/;/g, ",");
+  location.href = `mailto:${encodeURIComponent(to).replace(/%2C/g, ",")}?` + (cc ? `cc=${encodeURIComponent(cc).replace(/%2C/g, ",")}&` : "") +
+    `subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body + "\n\n(Bijlage: " + name + " – staat in je Downloads, even toevoegen aan deze mail.)")}`;
+  toast("Excel gedownload – voeg het toe als bijlage in de mail.", 5000);
+  return true;
+}
+const fileSafe = s => String(s || "").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_");
+function reportBlob(){ return buildXlsx([dagSheet(R)]); }
+function reportName(){ return `Werfrapport_${R.datum}_${fileSafe(R.werf) || "werf"}.xlsx`; }
+function reportText(){
+  const t = R.ploegen.reduce((a, p) => a + p.rijen.reduce((b, r) => b + num(r.uren), 0), 0);
+  return `Dagrapport ${R.werf} – ${dag(R.datum)} ${fmtD(R.datum)}\n` + R.ploegen.map(p => `${p.naam}: ${p.rijen.filter(r => r.naam).length} pers., ${p.rijen.reduce((b, r) => b + num(r.uren), 0)} u`).join("\n") +
+    `\nTotaal: ${t} u` +
+    ((R.mat || []).length ? `\nMaterieel: ${R.mat.reduce((a, x) => a + num(x.uren), 0)} u` : "") +
+    ((R.km || []).length ? `\nKilometers: ${R.km.reduce((a, x) => a + num(x.km), 0)} km` : "") +
+    `\n\n${S.naam}${S.bedrijf ? "\n" + S.bedrijf : ""}`;
+}
+$("mailBtn").onclick = async () => {
+  await saveNow();
+  if (!R.ploegen.length) return toast("Voeg eerst een ploeg toe.");
+  const ok = await shareOrMail(reportBlob(), reportName(), `Werfrapport ${R.werf} ${fmtD(R.datum)}`, reportText());
+  if (ok){ R.verzonden.push(new Date().toISOString()); await saveNow(); sentInfo(); }
+};
+$("dlBtn").onclick = async () => { await saveNow(); download(reportBlob(), reportName()); };
+
+function periodList(){
+  const van = $("p-van").value, tot = $("p-tot").value, w = $("p-werf").value.trim().toLowerCase();
+  return ALL.filter(r => !r.verwijderd && (!van || r.datum >= van) && (!tot || r.datum <= tot) && (!w || (r.werf || "").toLowerCase() === w))
+            .sort((a, b) => a.datum.localeCompare(b.datum) || (a.werf || "").localeCompare(b.werf || ""));
+}
+async function periodExport(mail){
+  const list = periodList(); if (!list.length) return toast("Geen rapporten in deze periode.");
+  const blob = buildXlsx(periodeSheets(list)), van = $("p-van").value || list[0].datum, tot = $("p-tot").value || list[list.length - 1].datum;
+  const name = `Uren_${van}_tot_${tot}${$("p-werf").value ? "_" + fileSafe($("p-werf").value) : ""}.xlsx`;
+  if (mail) shareOrMail(blob, name, `Urenoverzicht ${fmtD(van)} – ${fmtD(tot)}`, `Urenoverzicht van ${fmtD(van)} tot ${fmtD(tot)} (${list.length} dagrapporten).\n\n${S.naam}`);
+  else download(blob, name);
+}
+$("pMail").onclick = () => periodExport(true);
+$("pDl").onclick = () => periodExport(false);
+
+/* ================= HISTORIEK ================= */
+function renderHist(){
+  const q = $("h-zoek").value.trim().toLowerCase(), del = $("showDel").checked;
+  const list = ALL.filter(r => !!r.verwijderd === del)
+    .filter(r => !q || JSON.stringify([r.werf, r.opm, r.ploegen]).toLowerCase().includes(q))
+    .sort((a, b) => b.datum.localeCompare(a.datum) || b.gewijzigd.localeCompare(a.gewijzigd));
+  $("histList").innerHTML = list.length ? list.map(r => {
+    const t = r.ploegen.reduce((a, p) => a + p.rijen.reduce((b, x) => b + num(x.uren), 0), 0);
+    const st = r.verzonden.length ? (r.gewijzigd > r.verzonden[r.verzonden.length - 1] ? `<span class="badge warn">gewijzigd na verzenden</span>` : `<span class="badge ok">verzonden</span>`) : `<span class="badge">niet verzonden</span>`;
+    return `<div class="hist" data-id="${r.id}"><span class="d">${dag(r.datum)} ${fmtD(r.datum)}</span><span class="w">${esc(r.werf || "—")} · ${t} u</span>${st}
+      ${del ? `<button class="btn sm" data-rest="${r.id}">Terugzetten</button>` : `<button class="btn sm del" data-del="${r.id}" title="Naar prullenbak">🗑</button>`}</div>`;
+  }).join("") : `<p class="muted">${del ? "Prullenbak is leeg." : "Nog geen rapporten."}</p>`;
+}
+$("histList").addEventListener("click", async e => {
+  const b = e.target.closest("button"), row = e.target.closest(".hist"); if (!row) return;
+  const r = ALL.find(x => x.id === row.dataset.id);
+  if (b && b.dataset.del){ if (!confirm("Rapport naar de prullenbak verplaatsen? (Je kan het later terugzetten.)")) return;
+    r.verwijderd = true; await dbPut(r); mirror("rapporten", ALL);
+    if (R && R.id === r.id){ R = ALL.filter(x => !x.verwijderd).sort((a, b) => b.datum.localeCompare(a.datum))[0] || newReport(); await saveNow(); renderReport(); }
+    return renderHist(); }
+  if (b && b.dataset.rest){ r.verwijderd = false; await dbPut(r); mirror("rapporten", ALL); return renderHist(); }
+  if (r.verwijderd) return;
+  await saveNow(); R = r; await kvSet("laatste", R.id); renderReport(); show("rapport");
+});
+$("h-zoek").oninput = renderHist; $("showDel").onchange = renderHist;
+
+/* ================= INSTELLINGEN ================= */
+function renderSettings(){
+  $("s-naam").value = S.naam; $("s-bedrijf").value = S.bedrijf; $("s-mail").value = S.mail; $("s-cc").value = S.cc;
+  $("s-ploegen").innerHTML = S.ploegen.map((p, i) => `<div class="card" style="background:var(--bg)">
+     <h2><span class="grow">👷 ${esc(p.naam)}</span><button class="btn sm del" data-dp="${i}">Verwijder</button></h2>
+     <div>${p.leden.map((l, j) => `<span class="chip">${esc(l)}<button data-dl="${i}:${j}">×</button></span>`).join("") || '<span class="muted">Nog geen leden</span>'}</div>
+     <div style="display:flex;gap:8px;margin-top:8px"><input data-nl="${i}" placeholder="Naam toevoegen"><button class="btn sm" data-al="${i}">+</button></div></div>`).join("");
+  $("s-werven").innerHTML = S.werven.map((w, i) => `<span class="chip">${esc(w)}<button data-dw="${i}">×</button></span>`).join("") || '<span class="muted">Nog geen werven</span>';
+  $("s-begin").value = S.begin || ""; $("s-einde").value = S.einde || ""; $("s-pauze").value = S.pauze || "";
+  $("s-materieel").innerHTML = (S.materieel || []).map((w, i) => `<span class="chip">${esc(w)}<button data-dm="${i}">×</button></span>`).join("") || '<span class="muted">Nog niets</span>';
+  $("s-voertuigen").innerHTML = (S.voertuigen || []).map((w, i) => `<span class="chip">${esc(w)}<button data-dv="${i}">×</button></span>`).join("") || '<span class="muted">Nog niets</span>';
+  showLogo();
+  backupInfo();
+}
+["naam","bedrijf","mail","cc","begin","einde","pauze"].forEach(k => $("s-" + k).addEventListener("change", e => { S[k] = e.target.value.trim(); saveSettings(); }));
+function addToList(key, inp){ const n = $(inp).value.trim(); S[key] = S[key] || []; if (!n || S[key].includes(n)) return; S[key].push(n); $(inp).value = ""; saveSettings(); renderSettings(); }
+$("s-addMat").onclick = () => addToList("materieel", "s-newMat");
+$("s-addVoer").onclick = () => addToList("voertuigen", "s-newVoer");
+function showLogo(){
+  [$("logo"), $("logoPrev")].forEach(img => { img.classList.toggle("hidden", !S.logo); if (S.logo) img.src = S.logo; else img.removeAttribute("src"); });
+}
+$("logoBtn").onclick = () => $("logoFile").click();
+$("logoDel").onclick = () => { S.logo = ""; saveSettings(); showLogo(); };
+$("logoFile").onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = new Image();
+  img.onload = () => { // verkleinen zodat het weinig opslag kost
+    const k = Math.min(1, 400 / Math.max(img.width, img.height)), c = document.createElement("canvas");
+    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    S.logo = c.toDataURL("image/png"); saveSettings(); showLogo(); URL.revokeObjectURL(img.src);
+  };
+  img.src = URL.createObjectURL(f); e.target.value = "";
+};
+$("s-addPloeg").onclick = () => { const n = $("s-newPloeg").value.trim(); if (!n || S.ploegen.some(p => p.naam === n)) return; S.ploegen.push({ naam:n, leden:[] }); $("s-newPloeg").value = ""; saveSettings(); renderSettings(); };
+$("s-addWerf").onclick = () => { const n = $("s-newWerf").value.trim(); if (!n || S.werven.includes(n)) return; S.werven.push(n); $("s-newWerf").value = ""; saveSettings(); renderSettings(); };
+$("v-inst").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return; const d = b.dataset;
+  if (d.dp !== undefined){ if (!confirm(`Ploeg "${S.ploegen[+d.dp].naam}" uit de instellingen verwijderen? (Oude rapporten blijven behouden.)`)) return; S.ploegen.splice(+d.dp, 1); }
+  else if (d.dl){ const [i, j] = d.dl.split(":").map(Number); S.ploegen[i].leden.splice(j, 1); }
+  else if (d.al !== undefined){ const inp = document.querySelector(`[data-nl="${d.al}"]`), n = inp.value.trim(); if (!n) return; S.ploegen[+d.al].leden.push(n); }
+  else if (d.dw !== undefined){ S.werven.splice(+d.dw, 1); }
+  else if (d.dm !== undefined){ S.materieel.splice(+d.dm, 1); }
+  else if (d.dv !== undefined){ S.voertuigen.splice(+d.dv, 1); }
+  else return;
+  saveSettings(); renderSettings();
+});
+$("v-inst").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.dataset.nl !== undefined) document.querySelector(`[data-al="${e.target.dataset.nl}"]`).click(); });
+function fillLists(){
+  $("dl-werven").innerHTML = [...new Set([...S.werven, ...ALL.map(r => r.werf).filter(Boolean)])].map(w => `<option value="${esc(w)}">`).join("");
+  $("dl-namen").innerHTML = [...new Set([...S.ploegen.flatMap(p => p.leden), ...ALL.flatMap(r => r.ploegen.flatMap(p => p.rijen.map(x => x.naam))).filter(Boolean)])].map(n => `<option value="${esc(n)}">`).join("");
+  const opts = (key, rk) => [...new Set([...(S[key] || []), ...ALL.flatMap(r => (r[rk] || []).map(x => x.naam)).filter(Boolean)])].map(n => `<option value="${esc(n)}">`).join("");
+  $("dl-mat").innerHTML = opts("materieel", "mat"); $("dl-voer").innerHTML = opts("voertuigen", "km");
+}
+
+/* ================= BACKUP ================= */
+function backupBlob(){ return new Blob([JSON.stringify({ app:"werfrapport", versie:1, gemaakt:new Date().toISOString(), settings:S, rapporten:ALL }, null, 1)], { type:"application/json" }); }
+const backupName = () => `Werfrapport_backup_${today()}.json`;
+async function markBackup(){ await kvSet("laatsteBackup", new Date().toISOString()); mirror("laatsteBackup", new Date().toISOString()); backupInfo(); }
+async function backupInfo(){
+  const lb = await kvGet("laatsteBackup");
+  const dagen = lb ? Math.floor((Date.now() - new Date(lb)) / 864e5) : null;
+  $("backupInfo").textContent = (lb ? `Laatste backup: ${new Date(lb).toLocaleDateString("nl-BE")} (${dagen} dag(en) geleden).` : "Nog nooit een backup gemaakt.") + ` ${ALL.length} rapporten bewaard op dit toestel.`;
+  $("backupCard").classList.toggle("warnbox", !lb || dagen > 7);
+}
+$("bkDl").onclick = async () => { download(backupBlob(), backupName()); await markBackup(); };
+$("bkShare").onclick = async () => {
+  const f = new File([backupBlob()], backupName(), { type:"application/json" });
+  if (navigator.canShare && navigator.canShare({ files:[f] })){ try { await navigator.share({ files:[f], title:"Werfrapport backup" }); await markBackup(); } catch(e){} }
+  else { download(backupBlob(), backupName()); await markBackup(); toast("Backup gedownload – mail of bewaar het bestand zelf."); }
+};
+$("bkImp").onclick = () => $("bkFile").click();
+$("bkFile").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const data = JSON.parse(await f.text()); if (data.app !== "werfrapport") throw 0;
+    let n = 0;
+    for (const r of data.rapporten){ const ex = ALL.find(x => x.id === r.id);
+      if (!ex || r.gewijzigd > ex.gewijzigd){ await dbPut(r); n++; } }
+    if (!S.naam && data.settings) S = data.settings; else if (data.settings){
+      data.settings.ploegen.forEach(p => { const m = S.ploegen.find(x => x.naam === p.naam); if (!m) S.ploegen.push(p); else p.leden.forEach(l => m.leden.includes(l) || m.leden.push(l)); });
+      data.settings.werven.forEach(w => S.werven.includes(w) || S.werven.push(w)); }
+    await saveSettings(); ALL = await dbAll(); mirror("rapporten", ALL); renderSettings(); renderHist();
+    toast(`${n} rapport(en) teruggezet/bijgewerkt. Bestaande rapporten blijven behouden.`, 4000);
+  } catch(err){ toast("Dit is geen geldig backupbestand."); }
+  e.target.value = "";
+};
+
+/* ================= NAVIGATIE ================= */
+function show(v){
+  ["rapport","hist","inst"].forEach(x => $("v-" + x).classList.toggle("hidden", x !== v));
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
+  if (v === "hist") renderHist(); if (v === "inst") renderSettings();
+  if (v === "rapport") $("title").textContent = R.werf || "Werfrapport"; else $("title").textContent = v === "hist" ? "Historiek" : "Instellingen";
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll("nav button").forEach(b => b.onclick = async () => { await saveNow(); show(b.dataset.v); });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveNow(); });
+window.addEventListener("pagehide", () => saveNow());
+
+/* ================= START ================= */
+(async function init(){
+  db = await openDB();
+  S = Object.assign(S, (await kvGet("settings")) || mirrorGet("settings") || {});
+  ALL = await dbAll();
+  // Herstel uit localStorage-kopie als IndexedDB leeg of onvolledig is
+  const m = mirrorGet("rapporten") || [];
+  for (const r of m){ const ex = ALL.find(x => x.id === r.id); if (!ex || r.gewijzigd > ex.gewijzigd){ await dbPut(r); } }
+  if (m.length) ALL = await dbAll();
+  await kvSet("settings", S);
+
+  // Vraag de browser om de opslag nooit automatisch op te ruimen
+  let persist = false;
+  if (navigator.storage && navigator.storage.persist){ persist = await navigator.storage.persisted() || await navigator.storage.persist(); }
+  $("persistInfo").textContent = persist
+    ? "✅ Gegevens staan in permanente opslag op dit toestel: de browser ruimt ze niet automatisch op."
+    : "⚠️ De browser gaf geen permanente opslag. Installeer de app op je beginscherm (‘Toevoegen aan startscherm’) en maak regelmatig een backup.";
+
+  const last = await kvGet("laatste");
+  R = ALL.find(r => r.id === last && !r.verwijderd) || null;
+  if (!R){ R = newReport(); await saveNow(); }
+  fillLists(); renderReport(); showLogo();
+  $("p-van").value = today().slice(0, 8) + "01"; $("p-tot").value = today();
+  if (!S.naam) { show("inst"); toast("Welkom! Vul eerst je gegevens en ploegen in.", 4000); }
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(() => {});
+  $("saveState").textContent = "Opgeslagen ✓";
+})();
+</script>
+</body>
+</html>
