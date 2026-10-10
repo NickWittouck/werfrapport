@@ -439,6 +439,14 @@ function viewWeek(){
   </section>`;
 }
 
+function mailInfo(wid, m, wd){
+  const naam = werf(wid)?.naam || '';
+  const onderwerp = `Uren ${naam} – week ${isoWeek(m).w} (${kort(m)} – ${kort(addDays(m,6))})`;
+  const tekst = `Hallo,\n\nIn bijlage de uren van ${naam} voor week ${isoWeek(m).w} (${kort(m)} – ${kort(addDays(m,6))} ${parse(m).getFullYear()}).\n\n` +
+    wd.personen.map(p => `${p.naam}: ${decNL(p.min.reduce((a,b)=>a+b,0))} u`).join('\n') + `\n\nTotaal: ${decNL(wd.tot)} u\n\nMet vriendelijke groeten`;
+  return { adres: mailAdres(wid), onderwerp, tekst };
+}
+const kanDelen = () => { try{ return !!(S.local && navigator.canShare && window.XLSX && navigator.canShare({ files:[ new File(['x'], 't.xlsx', { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }) ] })); }catch{ return false; } };
 function mailPaneel(wid, m, wd){
   const adres = mailAdres(wid); const naam = werf(wid)?.naam || '';
   const onderwerp = `Uren ${naam} – week ${isoWeek(m).w} (${kort(m)} – ${kort(addDays(m,6))})`;
@@ -451,12 +459,16 @@ function mailPaneel(wid, m, wd){
     <div class="tools"><span class="adres" id="mailAdres">${esc(adres)}</span><button class="btn ghost" data-a="kopieer-tekst" data-t="mailAdres">Kopieer adres</button></div>
     <div class="small muted">Onderwerp</div><pre id="mailOnd">${esc(onderwerp)}</pre>
     <div class="small muted">Tekst</div><pre id="mailTxt">${esc(tekst)}</pre>
+    ${kanDelen() ? `<div class="tools"><button class="btn primary" data-a="deel">Mailen met Excel als bijlage</button></div>
+    <div class="small muted">Kies je mail-app (Outlook, Gmail, Mail). De Excel en de tekst staan er al in. Vul bij "Aan" het adres hierboven in en verstuur. Tik eerst op "Kopieer adres" om het te kunnen plakken.</div>
+    <div class="tools"><a class="btn ghost" href="${esc(mailto)}">Mail zonder bijlage openen</a><button class="btn ghost" data-a="xl-werf">Excel downloaden</button></div>` : `
     <div class="tools">
       ${S.dl && window.XLSX ? `<button class="btn" data-a="xl-werf">1. Excel downloaden</button>` : ''}
-      <a class="btn primary" href="${esc(mailto)}" target="_blank" rel="noopener">2. Mail openen</a>
+      <a class="btn primary" href="${esc(mailto)}" ${S.local ? '' : 'target="_blank" rel="noopener"'}>2. Mail openen</a>
       <button class="btn ghost" data-a="kopieer-tekst" data-t="mailTxt">Kopieer tekst</button>
     </div>
-    <div class="small muted">Voeg het gedownloade Excel-bestand als bijlage toe. Opent je mailprogramma niet, kopieer dan adres, onderwerp en tekst.</div>
+    <div class="small muted">Voeg het gedownloade Excel-bestand als bijlage toe. Opent je mailprogramma niet, kopieer dan adres, onderwerp en tekst.</div>`}
+    <div class="small muted">Let op: de mail vertrekt pas als je op Verzenden tikt in je mail-app.</div>
   </div>`;
 }
 
@@ -595,7 +607,7 @@ async function kopieerVorige(){
   }catch(e){ toast('Kopiëren lukte niet. Probeer opnieuw.'); }
 }
 
-async function xlsxSave(werfIds, m, src = S.dagen, suffix = ''){
+function maakXlsx(werfIds, m, src = S.dagen, suffix = ''){
   const wb = XLSX.utils.book_new();
   const dagen = [...Array(7)].map((_,i) => addDays(m,i));
   const totalen = [['Werf','Persoon', ...dagen.map((d,i) => `${DAGEN[i]} ${kort(d)}`), 'Totaal uren']];
@@ -619,7 +631,11 @@ async function xlsxSave(werfIds, m, src = S.dagen, suffix = ''){
   XLSX.utils.book_append_sheet(wb, t, 'Totalen');
   const buf = XLSX.write(wb, { bookType:'xlsx', type:'array' });
   const naam = werfIds.length === 1 ? (werf(werfIds[0])?.naam || 'werf').replace(/[^\p{L}\p{N}]+/gu,'-').replace(/^-|-$/g,'') : 'alle-werven';
-  try{ await S.dl.save({ filename:`Uren_${naam}_${weekCode(m)}${suffix}.xlsx`, data: new Blob([buf]) }); toast('Excel-bestand bewaard.'); }
+  return { filename:`Uren_${naam}_${weekCode(m)}${suffix}.xlsx`, buf };
+}
+async function xlsxSave(werfIds, m, src = S.dagen, suffix = ''){
+  const { filename, buf } = maakXlsx(werfIds, m, src, suffix);
+  try{ await S.dl.save({ filename, data: new Blob([buf]) }); toast('Excel-bestand bewaard.'); }
   catch(e){ if(e?.code !== 'declined') toast('Downloaden lukte niet in deze weergave.'); }
 }
 
@@ -645,6 +661,12 @@ document.addEventListener('click', async ev => {
     await S.dl.save({ filename:`Werfuren-backup-${vandaag()}.json`, data: blob }); toast('Back-upbestand gedownload.'); return; }
   if(a === 'imp-ok'){ S.db.importAll(S.confirmImport); S.confirmImport = null; S.weekKey = null; subWeek(); toast('Gegevens teruggezet.'); render(); return; }
   if(a === 'imp-nee'){ S.confirmImport = null; render(); return; }
+  if(a === 'deel'){ const m = maandag(S.datum); const info = mailInfo(S.werfId, m, weekData(S.werfId, m));
+    const { filename, buf } = maakXlsx([S.werfId], m);
+    const file = new File([buf], filename, { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    try{ await navigator.share({ files:[file], title: info.onderwerp, text: info.tekst }); }
+    catch(e){ if(e?.name !== 'AbortError') toast('Delen lukte niet. Gebruik "Excel downloaden" en voeg het bestand zelf toe.'); }
+    return; }
   if(a === 'mail-open'){ S.mailOpen = !S.mailOpen; render(); return; }
   if(a === 'kopieer-tekst'){ const el = document.getElementById(b.dataset.t); const txt = el?.textContent || '';
     try{ await navigator.clipboard.writeText(txt); toast('Gekopieerd.'); }
