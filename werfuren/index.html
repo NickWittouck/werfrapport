@@ -446,6 +446,20 @@ function mailInfo(wid, m, wd){
     wd.personen.map(p => `${p.naam}: ${decNL(p.min.reduce((a,b)=>a+b,0))} u`).join('\n') + `\n\nTotaal: ${decNL(wd.tot)} u\n\nMet vriendelijke groeten`;
   return { adres: mailAdres(wid), onderwerp, tekst };
 }
+function b64(buf){ const u = new Uint8Array(buf); let bin = ''; for(let i=0; i<u.length; i+=0x8000) bin += String.fromCharCode.apply(null, u.subarray(i, i+0x8000)); return btoa(bin); }
+async function verstuurAuto(wid, m){
+  const info = mailInfo(wid, m, weekData(wid, m)); const { filename, buf } = maakXlsx([wid], m);
+  toast('Mail wordt verstuurd…');
+  try{
+    const r = await fetch(S.instellingen.scriptUrl, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+      body: JSON.stringify({ app:'werfuren', aan: info.adres, onderwerp: info.onderwerp, tekst: info.tekst, bestandsnaam: filename, bestand: b64(buf) }) });
+    const res = await r.json();
+    if(!res.ok) throw new Error(res.fout || 'fout');
+    try{ await S.db.doc('weken/' + weekDocKey(wid, m)).update({ gemaild: new Date().toISOString(), gemaildAan: res.aan || info.adres }); }catch{}
+    toast(`Mail met Excel verstuurd naar ${res.aan || info.adres}.`); S.mailOpen = false;
+  }catch(e){ console.warn(e); S.mailOpen = true; toast('Automatisch mailen lukte niet. Verstuur de mail hieronder zelf.'); }
+  render();
+}
 const kanDelen = () => { try{ return !!(S.local && navigator.canShare && window.XLSX && navigator.canShare({ files:[ new File(['x'], 't.xlsx', { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }) ] })); }catch{ return false; } };
 function mailPaneel(wid, m, wd){
   const adres = mailAdres(wid); const naam = werf(wid)?.naam || '';
@@ -454,7 +468,10 @@ function mailPaneel(wid, m, wd){
     wd.personen.map(p => `${p.naam}: ${decNL(p.min.reduce((a,b)=>a+b,0))} u`).join('\n') + `\n\nTotaal: ${decNL(wd.tot)} u\n\nMet vriendelijke groeten`;
   if(!adres) return `<div class="mail"><strong>Nog geen e-mailadres ingesteld</strong><span class="small muted">Vul bij Beheer in naar welk adres de uren gemaild moeten worden.</span></div>`;
   const mailto = `mailto:${encodeURIComponent(adres)}?subject=${encodeURIComponent(onderwerp)}&body=${encodeURIComponent(tekst)}`;
-  return `<div class="mail">
+  const st = S.weken[weekDocKey(wid, m)];
+  const auto = S.local && S.instellingen.scriptUrl ? `<div class="tools">${st?.gemaild ? `<span class="pill ok">Automatisch gemaild ${kort(iso(new Date(st.gemaild)))} ${pad(new Date(st.gemaild).getHours())}:${pad(new Date(st.gemaild).getMinutes())}</span>` : ''}
+      <button class="btn primary" data-a="auto-mail">${st?.gemaild ? 'Opnieuw automatisch mailen' : 'Automatisch mailen'}</button></div>` : '';
+  return `<div class="mail">${auto}
     <div class="small muted">Stuur de Excel naar</div>
     <div class="tools"><span class="adres" id="mailAdres">${esc(adres)}</span><button class="btn ghost" data-a="kopieer-tekst" data-t="mailAdres">Kopieer adres</button></div>
     <div class="small muted">Onderwerp</div><pre id="mailOnd">${esc(onderwerp)}</pre>
@@ -565,6 +582,8 @@ function viewBeheer(){
   <p class="small muted">Gearchiveerde werven en personen verdwijnen uit de keuzelijsten, maar hun uren blijven bewaard.</p>
   ${S.local ? `<section class="panel"><div class="head"><h2>Gegevens op dit toestel</h2></div>
     <p class="small muted">Alle uren staan alleen op deze gsm of pc, in deze browser. Download geregeld een back-upbestand, zeker voor je de browsergeschiedenis wist of van toestel wisselt. Met dat bestand zet je alles terug, ook op een ander toestel.</p>
+    <label class="lbl small muted" for="scriptUrl">Automatisch mailen: link van je Google-script (optioneel)</label>
+    <input type="url" id="scriptUrl" value="${esc(S.instellingen.scriptUrl)}" placeholder="https://script.google.com/macros/s/…/exec" style="width:100%;margin-bottom:12px">
     <div class="tools"><button class="btn" data-a="exp-json">Back-upbestand downloaden</button>
       <label class="btn" for="impJson">Back-upbestand terugzetten</label><input type="file" id="impJson" accept=".json,application/json" hidden></div>
     ${S.confirmImport ? `<div class="banner">Dit vervangt alle gegevens op dit toestel door die uit het bestand. <button class="btn primary" data-a="imp-ok">Ja, terugzetten</button> <button class="btn ghost" data-a="imp-nee">Annuleren</button></div>` : ''}
@@ -661,6 +680,7 @@ document.addEventListener('click', async ev => {
     await S.dl.save({ filename:`Werfuren-backup-${vandaag()}.json`, data: blob }); toast('Back-upbestand gedownload.'); return; }
   if(a === 'imp-ok'){ S.db.importAll(S.confirmImport); S.confirmImport = null; S.weekKey = null; subWeek(); toast('Gegevens teruggezet.'); render(); return; }
   if(a === 'imp-nee'){ S.confirmImport = null; render(); return; }
+  if(a === 'auto-mail'){ b.disabled = true; await flush(); return verstuurAuto(S.werfId, maandag(S.datum)); }
   if(a === 'deel'){ const m = maandag(S.datum); const info = mailInfo(S.werfId, m, weekData(S.werfId, m));
     const { filename, buf } = maakXlsx([S.werfId], m);
     const file = new File([buf], filename, { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -679,8 +699,8 @@ document.addEventListener('click', async ev => {
       await S.db.doc('weken/' + weekDocKey(S.werfId, m)).set(a === 'indienen'
         ? { werf:S.werfId, maandag:m, ingediend:true, ingediendOp:new Date().toISOString(), door:S.myId || null }
         : { werf:S.werfId, maandag:m, ingediend:false });
-      if(a === 'indienen') S.mailOpen = true;
-      toast(a === 'indienen' ? 'Week doorgestuurd naar kantoor.' : 'Week heropend.'); }
+      toast(a === 'indienen' ? 'Week doorgestuurd naar kantoor.' : 'Week heropend.');
+      if(a === 'indienen'){ if(S.local && S.instellingen.scriptUrl) await verstuurAuto(S.werfId, m); else S.mailOpen = true; } }
     catch{ toast('Dat lukte niet. Probeer opnieuw.'); }
     return; }
   if(a === 'xl-bk'){ const bk = S.backups.find(x => x.id === b.dataset.id); if(!bk) return; const t = new Date(bk.gemaaktOp);
@@ -717,6 +737,9 @@ document.addEventListener('change', async ev => {
     if(v === '__nieuw'){ S.nieuwNaam = true; render(); $('#nwPers')?.focus(); return; }
     return voegToe(S.personen.find(p => p.id === v)); }
   if(t.dataset.ploeg){ const pid = t.value; if(!pid) return; await inPloeg(t.dataset.ploeg, pid); render(); return; }
+  if(t.id === 'scriptUrl'){ const url = t.value.trim();
+    if(url && !/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(url)){ toast('Plak de volledige link die eindigt op /exec.'); return; }
+    await S.db.doc('instellingen/algemeen').set({ ...S.instellingen, scriptUrl: url }); toast(url ? 'Automatisch mailen staat aan.' : 'Automatisch mailen staat uit.'); return; }
   if(t.id === 'mailStd'){ const email = t.value.trim();
     try{ await S.db.doc('instellingen/algemeen').set({ ...S.instellingen, email }); toast('E-mailadres bewaard.'); }catch{ toast('Opslaan lukte niet.'); } return; }
   if(t.dataset.mail){ const email = t.value.trim();
