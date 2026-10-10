@@ -141,11 +141,13 @@ td.wk{font-weight:700}
     </nav>
   </header>
   <div id="app"><div class="panel empty"><strong>Gegevens laden…</strong>Werven en uren worden opgehaald.</div></div>
+  <p class="small muted" id="versie" style="text-align:center;margin-top:24px"></p>
 </div>
 <div class="toast" id="toast" hidden></div>
 
 <script>
 (() => {
+const VERSIE = '10 okt 2026 · 3';
 const DAGEN = ['ma','di','wo','do','vr','za','zo'];
 const DAGEN_LANG = ['maandag','dinsdag','woensdag','donderdag','vrijdag','zaterdag','zondag'];
 const MAAND = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
@@ -233,7 +235,7 @@ const localDownloads = { save: async ({ filename, data }) => {
 async function boot(){
   let db, user, dl;
   if(window.claude?.use){ [db, user, dl] = await Promise.all([claude.use('db'), claude.use('user'), claude.use('downloads')]); }
-  else { db = localDb(); dl = localDownloads; S.local = true; $('#who').textContent = 'Gegevens worden op dit toestel bewaard'; }
+  else { db = localDb(); dl = localDownloads; S.local = true; $('#versie').textContent = 'Versie ' + VERSIE; $('#who').textContent = 'Gegevens worden op dit toestel bewaard'; }
   S.db = db; S.user = user; S.dl = dl;
   if(!db){ S.offline = true; render(); return; }
   if(user){
@@ -476,9 +478,8 @@ function mailPaneel(wid, m, wd){
     <div class="tools"><span class="adres" id="mailAdres">${esc(adres)}</span><button class="btn ghost" data-a="kopieer-tekst" data-t="mailAdres">Kopieer adres</button></div>
     <div class="small muted">Onderwerp</div><pre id="mailOnd">${esc(onderwerp)}</pre>
     <div class="small muted">Tekst</div><pre id="mailTxt">${esc(tekst)}</pre>
-    ${kanDelen() ? `<div class="tools"><button class="btn primary" data-a="deel">Mailen met Excel als bijlage</button></div>
-    <div class="small muted">Kies je mail-app (Outlook, Gmail, Mail). De Excel en de tekst staan er al in. Vul bij "Aan" het adres hierboven in en verstuur. Tik eerst op "Kopieer adres" om het te kunnen plakken.</div>
-    <div class="tools"><a class="btn ghost" href="${esc(mailto)}">Mail zonder bijlage openen</a><button class="btn ghost" data-a="xl-werf">Excel downloaden</button></div>` : `
+    ${S.local && window.XLSX ? `<div class="tools"><button class="btn primary" data-a="deel">Mailen met Excel als bijlage</button></div>
+    <div class="small muted">${kanDelen() ? 'Kies je mail-app (Outlook, Gmail, Mail). De Excel en de tekst staan er al in. Vul bij "Aan" het adres hierboven in en verstuur. Tik eerst op "Kopieer adres" om het te kunnen plakken.' : 'Deze browser kan geen bijlage doorgeven aan je mail-app. De Excel wordt gedownload en je mail opent: voeg het bestand daar zelf toe. Op gsm lukt het wel met Chrome (Android) of Safari (iPhone).'}</div>` : `
     <div class="tools">
       ${S.dl && window.XLSX ? `<button class="btn" data-a="xl-werf">1. Excel downloaden</button>` : ''}
       <a class="btn primary" href="${esc(mailto)}" ${S.local ? '' : 'target="_blank" rel="noopener"'}>2. Mail openen</a>
@@ -684,8 +685,12 @@ document.addEventListener('click', async ev => {
   if(a === 'deel'){ const m = maandag(S.datum); const info = mailInfo(S.werfId, m, weekData(S.werfId, m));
     const { filename, buf } = maakXlsx([S.werfId], m);
     const file = new File([buf], filename, { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    try{ await navigator.share({ files:[file], title: info.onderwerp, text: info.tekst }); }
-    catch(e){ if(e?.name !== 'AbortError') toast('Delen lukte niet. Gebruik "Excel downloaden" en voeg het bestand zelf toe.'); }
+    if(kanDelen()){
+      try{ await navigator.share({ files:[file], title: info.onderwerp, text: info.tekst }); return; }
+      catch(e){ if(e?.name === 'AbortError') return; }
+    }
+    await localDownloads.save({ filename, data: new Blob([buf]) });
+    location.href = `mailto:${encodeURIComponent(info.adres)}?subject=${encodeURIComponent(info.onderwerp)}&body=${encodeURIComponent(info.tekst)}`;
     return; }
   if(a === 'mail-open'){ S.mailOpen = !S.mailOpen; render(); return; }
   if(a === 'kopieer-tekst'){ const el = document.getElementById(b.dataset.t); const txt = el?.textContent || '';
