@@ -39,3 +39,9 @@ Snel testen op pc: `index.html` dubbelklikken (Chrome/Edge). Mailen gaat dan via
 
 Let op: de gegevens staan op **het toestel** van de werfleider. Bij een nieuwe gsm of "browsergegevens wissen"
 is de backup nodig — de gemailde Excels blijven natuurlijk ook bewaard in de mailbox.
+
+## Werfuren (map `werfuren/`)
+Aparte, eenvoudige app voor de werfleider: per werf en per dag start, stop en pauze per persoon,
+week doorsturen met Excel (blad "Uren per dag" + "Totalen") en back-ups van doorgestuurde weken.
+Online: `https://nickwittouck.github.io/werfrapport/werfuren/` (zodra GitHub Pages aan staat).
+Gegevens staan op het toestel zelf; bij Beheer kan je een back-upbestand downloaden en terugzetten.

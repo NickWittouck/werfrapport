@@ -1,0 +1,720 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1c2228">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Werfuren">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23f2b200'/%3E%3Ccircle cx='32' cy='32' r='18' fill='none' stroke='%231c2228' stroke-width='6'/%3E%3Cpath d='M32 22v11l7 5' stroke='%231c2228' stroke-width='6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Werfuren</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* Layout: één kolom-werkblad, sticky werkbalk (werf + datum), registratie als rijen die op gsm stapelen */
+:root{
+  --bg:#eceff1; --surface:#ffffff; --field:#f6f7f8; --ink:#1c2228; --muted:#5b6670; --line:#d3d9de;
+  --accent:#f2b200; --accent-ink:#1c2228; --accent-soft:#fff3c4;
+  --ok:#1d7548; --ok-soft:#dff2e7; --warn:#9a5600; --warn-soft:#fbead2; --danger:#b3261e;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#13171b; --surface:#1c2228; --field:#242b32; --ink:#e7ebee; --muted:#9aa5ae; --line:#323b44;
+  --accent:#f5c22b; --accent-ink:#13171b; --accent-soft:#3a3214;
+  --ok:#52c48c; --ok-soft:#173326; --warn:#f0a446; --warn-soft:#3b2a14; --danger:#ff8a80; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#13171b; --surface:#1c2228; --field:#242b32; --ink:#e7ebee; --muted:#9aa5ae; --line:#323b44;
+  --accent:#f5c22b; --accent-ink:#13171b; --accent-soft:#3a3214;
+  --ok:#52c48c; --ok-soft:#173326; --warn:#f0a446; --warn-soft:#3b2a14; --danger:#ff8a80; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45}
+.wrap{max-width:980px;margin:0 auto;padding-inline:16px;padding-block:0 48px}
+header.top{position:relative;padding-block:18px 10px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header.top::before{content:"";position:absolute;left:0;right:0;top:0;height:6px;border-radius:0 0 3px 3px;
+  background:repeating-linear-gradient(-45deg,var(--accent) 0 12px,var(--ink) 12px 24px);opacity:.9}
+h1{font-family:var(--f-display);font-size:2rem;line-height:1;margin:0;letter-spacing:.01em;text-transform:uppercase}
+h1 small{display:block;font-family:var(--f-body);font-size:.8rem;font-weight:500;color:var(--muted);text-transform:none;letter-spacing:0;margin-top:4px}
+h2{font-family:var(--f-display);font-size:1.4rem;margin:0;text-transform:uppercase;letter-spacing:.02em;text-wrap:balance}
+.tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px}
+.tabs button{border:0;background:transparent;color:var(--muted);font:600 .95rem var(--f-body);padding:8px 12px;border-radius:7px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line)}
+select,input{font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-height:42px}
+select:focus-visible,input:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.bar select{flex:1 1 200px;min-width:0;font-weight:600}
+.datenav{display:flex;gap:4px;align-items:center;flex:1 1 260px}
+.datenav input{flex:1;min-width:0}
+.btn{font:600 .95rem var(--f-body);border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:9px 14px;min-height:42px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;justify-content:center;text-decoration:none}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.dark{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.btn.sq{width:42px;padding:0}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:16px}
+.head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.muted{color:var(--muted)}
+.small{font-size:.85rem}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--field);color:var(--muted);white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.acc{background:var(--accent-soft);color:var(--ink)}
+.num{font-variant-numeric:tabular-nums}
+/* Dagregistratie */
+.rows{display:flex;flex-direction:column;gap:8px}
+.row{display:grid;grid-template-columns:minmax(0,1.5fr) repeat(3,minmax(0,.9fr)) 72px minmax(0,1.2fr) 36px;gap:8px;align-items:center;padding:8px;border-radius:10px;background:var(--field)}
+.row.headrow{background:transparent;padding-block:0;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.row .naam{font-weight:600;min-width:0;overflow-wrap:anywhere}
+.row input,.row select{width:100%;min-width:0;background:var(--surface)}
+.row .uren{font:700 1.15rem var(--f-display);text-align:right}
+.row label.l{display:none}
+.del{border:0;background:transparent;color:var(--muted);font-size:1.3rem;cursor:pointer;border-radius:6px;height:36px}
+.del:hover{color:var(--danger)}
+@media (max-width:720px){
+  .row.headrow{display:none}
+  .row{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px;position:relative}
+  .row .naam{font-size:1.05rem;padding-right:4px}
+  .row .uren{grid-column:2;grid-row:1;padding-right:40px}
+  .row label.l{display:block;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:2px}
+  .row .delc{position:absolute;top:4px;right:4px}
+}
+.add{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.add input{flex:1 1 200px;min-width:0}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.std{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:.9rem;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
+.std input{width:auto;min-height:36px;padding:5px 8px}
+.total{display:flex;justify-content:space-between;align-items:baseline;margin-top:12px;padding-top:12px;border-top:2px solid var(--ink)}
+.total b{font:700 1.6rem var(--f-display)}
+.saved{font-size:.85rem;color:var(--muted)}
+.saved.err{color:var(--danger)}
+.empty{text-align:center;padding:28px 12px;color:var(--muted)}
+.empty strong{display:block;color:var(--ink);font-size:1.05rem;margin-bottom:4px}
+/* Tabellen */
+.tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--surface)}
+thead th{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--surface)}
+thead th small{display:block;text-transform:none;letter-spacing:0;font-weight:500}
+tfoot td{font-weight:700;border-bottom:0;border-top:2px solid var(--ink)}
+td.z{color:var(--line)}
+td.wk{font-weight:700}
+.list{display:flex;flex-direction:column;gap:6px}
+.li{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.li input{flex:1 1 200px;min-width:0}
+.li.off input{opacity:.55;text-decoration:line-through}
+.banner{margin-top:12px;padding:10px 14px;border-radius:10px;background:var(--warn-soft);color:var(--warn);font-weight:500}
+.banner.info{background:var(--accent-soft);color:var(--ink)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:2px;background:var(--field);border:1px solid var(--line);border-radius:999px;padding:2px 4px 2px 10px;font-size:.88rem;font-weight:500}
+.chip button{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:1rem;width:24px;height:24px;border-radius:50%}
+.chip button:hover{color:var(--danger)}
+.werfblok{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:10px;background:var(--field)}
+.werfblok.off{opacity:.6}
+.werfblok input,.werfblok select{background:var(--surface)}
+.werfblok .lbl{font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.mail{margin-top:14px;padding:14px;border-radius:10px;border:1px dashed var(--line);display:flex;flex-direction:column;gap:10px}
+.mail .adres{font-weight:700;user-select:all;overflow-wrap:anywhere}
+.mail pre{margin:0;white-space:pre-wrap;font:inherit;font-size:.9rem;background:var(--field);padding:10px;border-radius:8px;user-select:all;max-height:220px;overflow:auto}
+.add select{flex:1 1 220px;min-width:0}
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;max-width:calc(100% - 32px)}
+@media (prefers-reduced-motion:no-preference){.btn,.tabs button{transition:background .15s,border-color .15s}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>Werfuren<small id="who">Prestaties per werf, per dag, per persoon</small></h1>
+    <nav class="tabs" role="tablist" id="tabs">
+      <button role="tab" data-v="dag">Dag</button>
+      <button role="tab" data-v="week">Week</button>
+      <button role="tab" data-v="kantoor">Kantoor</button>
+      <button role="tab" data-v="beheer">Beheer</button>
+    </nav>
+  </header>
+  <div id="app"><div class="panel empty"><strong>Gegevens laden…</strong>Werven en uren worden opgehaald.</div></div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+const DAGEN = ['ma','di','wo','do','vr','za','zo'];
+const DAGEN_LANG = ['maandag','dinsdag','woensdag','donderdag','vrijdag','zaterdag','zondag'];
+const MAAND = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ls = { get(k, d){ try{ const v = localStorage.getItem('werfuren.'+k); return v == null ? d : JSON.parse(v); }catch{ return d; } },
+             set(k, v){ try{ localStorage.setItem('werfuren.'+k, JSON.stringify(v)); }catch{} } };
+
+// ---- datum & uren ----
+const pad = n => String(n).padStart(2,'0');
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parse = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate()+n); return iso(d); };
+const vandaag = () => iso(new Date());
+const maandag = s => { const d = parse(s); const wd = (d.getDay()+6)%7; d.setDate(d.getDate()-wd); return iso(d); };
+const dagIdx = s => (parse(s).getDay()+6)%7;
+function isoWeek(s){ const d = parse(s); d.setDate(d.getDate()+3-((d.getDay()+6)%7)); const y = d.getFullYear();
+  const j4 = new Date(y,0,4); return { y, w: 1 + Math.round(((d - j4)/864e5 - 3 + ((j4.getDay()+6)%7))/7) }; }
+const weekCode = s => { const {y,w} = isoWeek(s); return `${y}-W${pad(w)}`; };
+const kort = s => { const d = parse(s); return `${d.getDate()} ${MAAND[d.getMonth()]}`; };
+const weekLabel = m => `Week ${isoWeek(m).w} · ${kort(m)} – ${kort(addDays(m,6))} ${parse(addDays(m,6)).getFullYear()}`;
+const tmin = t => { if(!t || !/^\d{1,2}:\d{2}$/.test(t)) return null; const [h,m] = t.split(':').map(Number); return h*60+m; };
+function werkMin(r){ const a = tmin(r.start), b = tmin(r.stop); if(a==null || b==null) return 0;
+  let d = b - a; if(d < 0) d += 1440; return Math.max(0, d - (Number(r.pauze)||0)); }
+const hm = m => m ? `${Math.floor(m/60)}:${pad(Math.round(m%60))}` : '–';
+const dec = m => Math.round(m/60*100)/100;
+const xlDate = s => { const [y,m,d] = s.split('-').map(Number); return (Date.UTC(y,m-1,d) - Date.UTC(1899,11,30)) / 864e5; };
+const decNL = m => dec(m).toFixed(2).replace('.', ',');
+
+// ---- staat ----
+const S = {
+  db:null, user:null, dl:null, canWrite:true, myId:null, ready:false, offline:false,
+  werven:[], personen:[], weken:{}, dagen:{}, backups:[], confirmRestore:null, instellingen:{}, nieuwNaam:false, weekKey:null, unsubWeek:null, unsubBack:null, weekLoaded:false,
+  view: ls.get('view','dag'), werfId: ls.get('werf', null), datum: vandaag(),
+  rows:[], rowsKey:null, dirty:false, saving:null, saveTimer:null, saveState:'',
+  std: ls.get('std', {start:'07:30', stop:'16:00', pauze:30}), names:{}
+};
+const actieveWerven = () => S.werven.filter(w => w.actief !== false).sort((a,b)=>a.naam.localeCompare(b.naam,'nl'));
+const werf = id => S.werven.find(w => w.id === id);
+const dagKey = (wid, d) => `${wid}_${d}`;
+const weekDocKey = (wid, m) => `${wid}_${m}`;
+
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(()=> t.hidden = true, 2600); }
+
+// ---- opslag ----
+// ---- zelfstandige modus: alles op dit toestel ----
+function localDb(){
+  const KEY = 'werfuren.db'; let store = {};
+  try{ store = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; }catch{}
+  const subs = new Set();
+  const persist = () => { try{ localStorage.setItem(KEY, JSON.stringify(store)); }catch{ toast('Opslaan op dit toestel lukte niet. Is het geheugen vol?'); } };
+  const notify = () => setTimeout(() => subs.forEach(f => f()), 0);
+  const snap = (p) => ({ id: p.split('/').pop(), exists: p in store, data: () => store[p] ? structuredClone(store[p]) : undefined, metadata:{fromCache:false, hasPendingWrites:false} });
+  const ops = { '==':(a,b)=>a===b, '!=':(a,b)=>a!==b, '<':(a,b)=>a<b, '<=':(a,b)=>a<=b, '>':(a,b)=>a>b, '>=':(a,b)=>a>=b };
+  function run(col, f, ob, lim){
+    const n = col.split('/').length + 1;
+    let docs = Object.keys(store).filter(p => p.startsWith(col + '/') && p.split('/').length === n).sort().map(snap)
+      .filter(d => f.every(([k,o,v]) => ops[o](d.data()[k], v)));
+    if(ob) docs.sort((a,b) => (a.data()[ob[0]] > b.data()[ob[0]] ? 1 : a.data()[ob[0]] < b.data()[ob[0]] ? -1 : 0) * (ob[1] === 'desc' ? -1 : 1));
+    if(lim) docs = docs.slice(0, lim);
+    return { docs, size: docs.length, empty: !docs.length, metadata:{fromCache:false, hasPendingWrites:false}, docChanges: () => [] };
+  }
+  const q = (col, f=[], ob=null, lim=null) => ({ path: col,
+    where:(k,o,v) => q(col,[...f,[k,o,v]],ob,lim), orderBy:(k,d) => q(col,f,[k,d],lim), limit:l => q(col,f,ob,l),
+    get: async () => run(col,f,ob,lim),
+    onSnapshot(next){ const r = () => next(run(col,f,ob,lim)); subs.add(r); setTimeout(r,0); return () => subs.delete(r); },
+    doc: id => dref(col + '/' + (id || (Date.now().toString(36) + Math.random().toString(36).slice(2,8)))),
+    add: async data => { const d = q(col).doc(); await d.set(data); return d; } });
+  const dref = p => ({ id: p.split('/').pop(), path: p,
+    get: async () => snap(p),
+    set: async d => { store[p] = structuredClone(d); persist(); notify(); },
+    update: async d => { if(!(p in store)) throw { code:'invalid_argument', message:'missing' }; store[p] = { ...store[p], ...structuredClone(d) }; persist(); notify(); },
+    delete: async () => { delete store[p]; persist(); notify(); },
+    onSnapshot(next){ const r = () => next(snap(p)); subs.add(r); setTimeout(r,0); return () => subs.delete(r); },
+    collection: c => q(p + '/' + c) });
+  return { doc: dref, collection: c => q(c),
+    exportAll: () => structuredClone(store),
+    importAll: data => { store = structuredClone(data); persist(); notify(); } };
+}
+const localDownloads = { save: async ({ filename, data }) => {
+  const url = URL.createObjectURL(data instanceof Blob ? data : new Blob([data]));
+  const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000); return { status:'saved' }; } };
+
+async function boot(){
+  let db, user, dl;
+  if(window.claude?.use){ [db, user, dl] = await Promise.all([claude.use('db'), claude.use('user'), claude.use('downloads')]); }
+  else { db = localDb(); dl = localDownloads; S.local = true; $('#who').textContent = 'Gegevens worden op dit toestel bewaard'; }
+  S.db = db; S.user = user; S.dl = dl;
+  if(!db){ S.offline = true; render(); return; }
+  if(user){
+    try{ S.myId = await user.id(); }catch{}
+    try{ const c = await user.can('data.write'); if(c === false) S.canWrite = false; }catch{}
+    try{ const me = await user.me(); if(me?.name) $('#who').textContent = `Ingelogd als ${me.name}`; }catch{}
+  }
+  db.collection('werven').onSnapshot(s => { S.werven = s.docs.map(d => ({id:d.id, ...d.data()})); S.ready = true; fixWerf(); render(); }, dbErr);
+  db.collection('personen').onSnapshot(s => { S.personen = s.docs.map(d => ({id:d.id, ...d.data()})); if(!(S.view==='dag' && S.dirty)) render(); }, dbErr);
+  db.doc('instellingen/algemeen').onSnapshot(d => { S.instellingen = d.exists ? d.data() : {}; if(!(S.view==='dag' && S.dirty)) render(); }, dbErr);
+  db.collection('weken').onSnapshot(s => { S.weken = {}; s.docs.forEach(d => S.weken[d.id] = d.data()); if(!(S.view==='dag' && S.dirty)) render(); }, dbErr);
+  subWeek();
+}
+function dbErr(e){ console.warn(e); toast(e.code === 'revoked' ? 'Toegang tot de gegevens is gewijzigd.' : 'Gegevens konden niet geladen worden.'); }
+function fixWerf(){ const a = actieveWerven(); if(!a.find(w => w.id === S.werfId)) S.werfId = a[0]?.id || null; syncRows(); }
+
+function subWeek(){
+  if(!S.db) return;
+  const m = maandag(S.datum);
+  if(S.weekKey === m) return;
+  S.unsubWeek?.(); S.weekKey = m; S.dagen = {}; S.weekLoaded = false;
+  S.unsubWeek = S.db.collection('dagen').where('datum','>=',m).where('datum','<=',addDays(m,6))
+    .onSnapshot(s => { S.dagen = {}; s.docs.forEach(d => S.dagen[d.id] = d.data()); S.weekLoaded = true;
+      if(S.view === 'dag' && S.dirty) return;
+      const k = S.werfId ? dagKey(S.werfId, S.datum) : null;
+      const same = S.view === 'dag' && S.rowsKey === k && JSON.stringify(S.dagen[k]?.rijen || []) === JSON.stringify(S.rows);
+      syncRows(); if(!same) render(); }, dbErr);
+  S.unsubBack?.(); S.backups = [];
+  S.unsubBack = S.db.collection('backups').where('maandag','==',m)
+    .onSnapshot(s => { S.backups = s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => b.gemaaktOp.localeCompare(a.gemaaktOp));
+      if(S.view === 'kantoor') render(); }, dbErr);
+}
+function syncRows(){
+  if(S.dirty) return;
+  const k = S.werfId ? dagKey(S.werfId, S.datum) : null;
+  S.rowsKey = k;
+  S.rows = k && S.dagen[k] ? structuredClone(S.dagen[k].rijen || []) : [];
+}
+
+function markDirty(){
+  S.dirty = true; S.saveState = 'Wijzigingen…'; paintSaved();
+  clearTimeout(S.saveTimer); S.saveTimer = setTimeout(save, 900);
+}
+async function save(){
+  clearTimeout(S.saveTimer);
+  if(S.saving) { await S.saving; if(!S.dirty) return; }
+  if(!S.dirty || !S.rowsKey || !S.db) return;
+  const key = S.rowsKey, wid = S.werfId, datum = S.datum;
+  const rijen = structuredClone(S.rows);
+  S.dirty = false; S.saveState = 'Opslaan…'; paintSaved();
+  const ref = S.db.doc('dagen/' + key);
+  S.saving = (async () => {
+    try{
+      if(rijen.length) await ref.set({ werf: wid, datum, rijen, bijgewerkt: new Date().toISOString(), door: S.myId || null });
+      else await ref.delete();
+      if(!S.dirty){ S.saveState = 'Opgeslagen'; }
+    }catch(e){
+      S.dirty = true; S.saveState = e.code === 'invalid_argument' ? 'Je hebt geen schrijfrechten.' : 'Niet opgeslagen. Probeer opnieuw.';
+      if(e.code === 'invalid_argument') S.canWrite = false;
+    }
+    paintSaved();
+  })();
+  await S.saving; S.saving = null;
+}
+async function flush(){ if(S.dirty) await save(); else if(S.saving) await S.saving; }
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') flush(); });
+
+function paintSaved(){ const el = $('#saved'); if(!el) return; el.textContent = S.saveState;
+  el.classList.toggle('err', /Niet|geen/.test(S.saveState)); }
+
+async function navigate(fn){ await flush();
+  if(S.dirty){ S.dirty = false; S.saveState = ''; toast('Laatste wijziging kon niet bewaard worden.'); }
+  fn(); subWeek(); syncRows(); ls.set('werf', S.werfId); render(); }
+
+// ---- weergave ----
+function render(){
+  document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.v === S.view));
+  const app = $('#app');
+  if(S.offline){ app.innerHTML = `<div class="panel empty"><strong>Opslag niet beschikbaar</strong>Open de app via je claude.ai-account om uren in te vullen en te bekijken.</div>`; return; }
+  if(!S.ready){ return; }
+  let html = '';
+  if(!S.canWrite) html += `<div class="banner">Je kan deze uren bekijken maar niet wijzigen. Vraag de eigenaar om je als bewerker toe te voegen.</div>`;
+  if(S.view !== 'beheer' && !actieveWerven().length){
+    app.innerHTML = html + `<div class="panel empty"><strong>Nog geen werven</strong>Voeg eerst een werf toe, bijvoorbeeld "Residentie Leiezicht – Kortrijk".
+      <div class="add" style="justify-content:center;max-width:520px;margin:14px auto 0"><input id="nwWerf0" placeholder="Naam van de werf"><button class="btn primary" data-a="werf-add0">Werf toevoegen</button></div></div>`;
+    return;
+  }
+  if(S.view === 'dag') html += viewDag();
+  if(S.view === 'week') html += viewWeek();
+  if(S.view === 'kantoor') html += viewKantoor();
+  if(S.view === 'beheer') html += viewBeheer();
+  const ae = document.activeElement, f = ae?.id; let sel = null;
+  try{ if(ae && ae.selectionStart != null) sel = [ae.selectionStart, ae.selectionEnd]; }catch{}
+  app.innerHTML = html;
+  const nf = f && document.getElementById(f);
+  if(nf){ nf.focus(); try{ if(sel) nf.setSelectionRange(sel[0], sel[1]); }catch{} }
+  paintSaved(); resolveNames();
+}
+
+function werfSelect(){ return `<select id="werfSel" aria-label="Werf">${actieveWerven().map(w => `<option value="${esc(w.id)}" ${w.id===S.werfId?'selected':''}>${esc(w.naam)}</option>`).join('')}</select>`; }
+
+function weekStatus(wid, m){
+  const st = S.weken[weekDocKey(wid, m)];
+  if(!st?.ingediend) return { html:`<span class="pill">Open</span>`, st:null };
+  const later = Object.values(S.dagen).some(d => d.werf === wid && d.datum >= m && d.datum <= addDays(m,6) && d.bijgewerkt > st.ingediendOp);
+  const when = new Date(st.ingediendOp); const t = `${kort(iso(when))} ${pad(when.getHours())}:${pad(when.getMinutes())}`;
+  return { html: later ? `<span class="pill warn">Gewijzigd na doorsturen</span>` : `<span class="pill ok">Doorgestuurd ${t}</span>`, st, later };
+}
+
+function viewDag(){
+  const w = werf(S.werfId); const m = maandag(S.datum); const ws = weekStatus(S.werfId, m);
+  const tot = S.rows.reduce((a,r) => a + werkMin(r), 0);
+  const dis = S.canWrite ? '' : 'disabled';
+  const opDag = new Set(S.rows.map(r => r.pid));
+  const ploeg = ploegVan(S.werfId).filter(p => !opDag.has(p.id));
+  const ploegIds = new Set((werf(S.werfId)?.ploeg) || []);
+  const andere = S.personen.filter(p => p.actief !== false && !opDag.has(p.id) && !ploegIds.has(p.id)).sort((a,b)=>a.naam.localeCompare(b.naam,'nl'));
+  return `
+  <div class="bar">${werfSelect()}
+    <div class="datenav"><button class="btn sq" data-a="dag-prev" aria-label="Vorige dag">‹</button>
+      <input type="date" id="datum" value="${S.datum}" aria-label="Datum">
+      <button class="btn sq" data-a="dag-next" aria-label="Volgende dag">›</button>
+      <button class="btn ghost" data-a="dag-today">Vandaag</button></div>
+  </div>
+  <section class="panel">
+    <div class="head"><div><h2>${DAGEN_LANG[dagIdx(S.datum)]} ${kort(S.datum)}</h2>
+      <div class="small muted">${esc(w?.naam)} · week ${isoWeek(S.datum).w} ${ws.html}</div></div>
+      <div class="tools"><span id="saved" class="saved" aria-live="polite"></span>
+        ${S.rows.length ? '' : `<button class="btn" data-a="kopieer" ${dis}>Ploeg vorige werkdag kopiëren</button>`}</div></div>
+    ${!S.weekLoaded ? `<div class="empty">Uren laden…</div>` : S.rows.length ? `
+    <div class="rows">
+      <div class="row headrow"><span>Persoon</span><span>Start</span><span>Stop</span><span>Pauze</span><span style="text-align:right">Uren</span><span>Opmerking</span><span></span></div>
+      ${S.rows.map((r,i) => `
+      <div class="row" data-i="${i}">
+        <div class="naam">${esc(r.naam)}</div>
+        <div><label class="l" for="s${i}">Start</label><input type="time" id="s${i}" data-f="start" value="${esc(r.start)}" ${dis}></div>
+        <div><label class="l" for="e${i}">Stop</label><input type="time" id="e${i}" data-f="stop" value="${esc(r.stop)}" ${dis}></div>
+        <div><label class="l" for="p${i}">Pauze</label><select id="p${i}" data-f="pauze" ${dis}>${[0,15,30,45,60,90].map(p => `<option value="${p}" ${Number(r.pauze)===p?'selected':''}>${p} min</option>`).join('')}</select></div>
+        <div class="uren num" data-u="${i}">${hm(werkMin(r))}</div>
+        <div class="opm"><label class="l" for="o${i}">Opmerking</label><input id="o${i}" data-f="opm" value="${esc(r.opm)}" placeholder="bv. ziek, verlof, andere werf" ${dis}></div>
+        <div class="delc"><button class="del" data-a="rij-weg" aria-label="${esc(r.naam)} verwijderen" ${dis}>×</button></div>
+      </div>`).join('')}
+    </div>
+    <div class="total"><span class="muted">${S.rows.length} ${S.rows.length===1?'persoon':'personen'}</span><b class="num" id="dagTot">${hm(tot)} u</b></div>`
+    : `<div class="empty"><strong>Nog niemand ingevuld voor deze dag</strong>Voeg hieronder een persoon toe, of kopieer de ploeg van de vorige werkdag.</div>`}
+    ${S.canWrite ? `
+    <div class="add">
+      <select id="persSel" aria-label="Persoon toevoegen">
+        <option value="">+ Persoon toevoegen…</option>
+        ${ploeg.length ? `<optgroup label="Ploeg ${esc(w?.naam)}">${ploeg.map(p => `<option value="${esc(p.id)}">${esc(p.naam)}</option>`).join('')}</optgroup>` : ''}
+        ${andere.length ? `<optgroup label="Andere personen">${andere.map(p => `<option value="${esc(p.id)}">${esc(p.naam)}</option>`).join('')}</optgroup>` : ''}
+        <option value="__nieuw">Nieuwe naam typen…</option>
+      </select>
+      ${ploeg.length ? `<button class="btn" data-a="allen">Hele ploeg toevoegen (${ploeg.length})</button>` : ''}</div>
+    ${S.nieuwNaam || !S.personen.length ? `<div class="add"><input id="nwPers" placeholder="Naam nieuwe persoon" autocomplete="off"><button class="btn primary" data-a="pers-add">Toevoegen</button></div>` : ''}
+    <div class="std"><span class="muted">Standaarduren:</span>
+      <input type="time" id="stdS" value="${S.std.start}" aria-label="Standaard start"> tot
+      <input type="time" id="stdE" value="${S.std.stop}" aria-label="Standaard stop"> pauze
+      <select id="stdP" aria-label="Standaard pauze">${[0,15,30,45,60,90].map(p => `<option value="${p}" ${S.std.pauze===p?'selected':''}>${p} min</option>`).join('')}</select>
+      ${S.rows.length ? `<button class="btn ghost" data-a="std-all">Toepassen op iedereen</button>` : ''}</div>` : ''}
+  </section>`;
+}
+
+function weekData(wid, m, src = S.dagen){
+  const dagen = [...Array(7)].map((_,i) => addDays(m,i));
+  const per = new Map();
+  dagen.forEach((d,i) => { const doc = src[dagKey(wid,d)]; (doc?.rijen||[]).forEach(r => {
+    const k = r.pid || r.naam; if(!per.has(k)) per.set(k, { naam:r.naam, min:Array(7).fill(0), rijen:[] });
+    const p = per.get(k); const mm = werkMin(r); p.min[i] += mm; p.rijen.push({ ...r, datum:d, min:mm });
+  }); });
+  const personen = [...per.values()].sort((a,b) => a.naam.localeCompare(b.naam,'nl'));
+  const dagTot = dagen.map((_,i) => personen.reduce((a,p) => a + p.min[i], 0));
+  return { dagen, personen, dagTot, tot: dagTot.reduce((a,b)=>a+b,0) };
+}
+
+function viewWeek(){
+  const m = maandag(S.datum); const wd = weekData(S.werfId, m); const ws = weekStatus(S.werfId, m);
+  const showWe = wd.dagTot[5] || wd.dagTot[6];
+  const idx = showWe ? [0,1,2,3,4,5,6] : [0,1,2,3,4];
+  return `
+  <div class="bar">${werfSelect()}
+    <div class="datenav"><button class="btn sq" data-a="wk-prev" aria-label="Vorige week">‹</button>
+      <input type="date" id="datum" value="${S.datum}" aria-label="Dag in de week">
+      <button class="btn sq" data-a="wk-next" aria-label="Volgende week">›</button></div>
+  </div>
+  <section class="panel">
+    <div class="head"><div><h2>${weekLabel(m)}</h2><div class="small muted">${esc(werf(S.werfId)?.naam)} ${ws.html}</div></div>
+      <div class="tools">
+        ${S.dl && window.XLSX ? `<button class="btn" data-a="xl-werf">Excel downloaden</button>` : ''}
+        ${ws.st ? `<button class="btn" data-a="mail-open">${S.mailOpen ? 'Mail verbergen' : 'Mail opstellen'}</button>` : ''}
+        ${S.canWrite ? (ws.st && !ws.later ? `<button class="btn ghost" data-a="heropen">Heropenen</button>` : `<button class="btn primary" data-a="indienen" ${wd.tot?'':'disabled'}>${ws.later ? 'Opnieuw doorsturen' : 'Week doorsturen naar kantoor'}</button>`) : ''}
+      </div></div>
+    ${ws.st && S.mailOpen ? mailPaneel(S.werfId, m, wd) : ''}
+    ${!S.weekLoaded ? `<div class="empty">Uren laden…</div>` : wd.personen.length ? `
+    <div class="tscroll"><table>
+      <thead><tr><th>Persoon</th>${idx.map(i => `<th>${DAGEN[i]}<small>${kort(wd.dagen[i])}</small></th>`).join('')}<th>Totaal</th></tr></thead>
+      <tbody>${wd.personen.map(p => `<tr><td>${esc(p.naam)}</td>${idx.map(i => `<td class="${p.min[i]?'':'z'}">${hm(p.min[i])}</td>`).join('')}<td class="wk">${hm(p.min.reduce((a,b)=>a+b,0))}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td>Totaal</td>${idx.map(i => `<td>${hm(wd.dagTot[i])}</td>`).join('')}<td>${hm(wd.tot)}</td></tr></tfoot>
+    </table></div>
+    <p class="small muted">Uren = stop − start − pauze, in uren:minuten. In Excel staan ze ook als decimaal (7:30 = 7,50). Bij elke keer doorsturen wordt een back-up bewaard (zie Kantoor).</p>`
+    : `<div class="empty"><strong>Geen uren deze week</strong>Vul per dag de ploeg in via het tabblad Dag.</div>`}
+    ${!S.dl ? `<p class="small muted">Excel downloaden kan in deze weergave niet. Open de app in claude.ai.</p>` : ''}
+  </section>`;
+}
+
+function mailPaneel(wid, m, wd){
+  const adres = mailAdres(wid); const naam = werf(wid)?.naam || '';
+  const onderwerp = `Uren ${naam} – week ${isoWeek(m).w} (${kort(m)} – ${kort(addDays(m,6))})`;
+  const tekst = `Hallo,\n\nIn bijlage de uren van ${naam} voor week ${isoWeek(m).w} (${kort(m)} – ${kort(addDays(m,6))} ${parse(m).getFullYear()}).\n\n` +
+    wd.personen.map(p => `${p.naam}: ${decNL(p.min.reduce((a,b)=>a+b,0))} u`).join('\n') + `\n\nTotaal: ${decNL(wd.tot)} u\n\nMet vriendelijke groeten`;
+  if(!adres) return `<div class="mail"><strong>Nog geen e-mailadres ingesteld</strong><span class="small muted">Vul bij Beheer in naar welk adres de uren gemaild moeten worden.</span></div>`;
+  const mailto = `mailto:${encodeURIComponent(adres)}?subject=${encodeURIComponent(onderwerp)}&body=${encodeURIComponent(tekst)}`;
+  return `<div class="mail">
+    <div class="small muted">Stuur de Excel naar</div>
+    <div class="tools"><span class="adres" id="mailAdres">${esc(adres)}</span><button class="btn ghost" data-a="kopieer-tekst" data-t="mailAdres">Kopieer adres</button></div>
+    <div class="small muted">Onderwerp</div><pre id="mailOnd">${esc(onderwerp)}</pre>
+    <div class="small muted">Tekst</div><pre id="mailTxt">${esc(tekst)}</pre>
+    <div class="tools">
+      ${S.dl && window.XLSX ? `<button class="btn" data-a="xl-werf">1. Excel downloaden</button>` : ''}
+      <a class="btn primary" href="${esc(mailto)}" target="_blank" rel="noopener">2. Mail openen</a>
+      <button class="btn ghost" data-a="kopieer-tekst" data-t="mailTxt">Kopieer tekst</button>
+    </div>
+    <div class="small muted">Voeg het gedownloade Excel-bestand als bijlage toe. Opent je mailprogramma niet, kopieer dan adres, onderwerp en tekst.</div>
+  </div>`;
+}
+
+function viewKantoor(){
+  const m = maandag(S.datum);
+  const rows = actieveWerven().map(w => ({ w, wd: weekData(w.id, m), ws: weekStatus(w.id, m) }))
+    .filter(x => x.wd.tot || x.ws.st);
+  const tot = rows.reduce((a,x) => a + x.wd.tot, 0);
+  const klaar = rows.filter(x => x.ws.st && !x.ws.later).length;
+  return `
+  <div class="bar"><div class="datenav"><button class="btn sq" data-a="wk-prev" aria-label="Vorige week">‹</button>
+      <input type="date" id="datum" value="${S.datum}" aria-label="Dag in de week">
+      <button class="btn sq" data-a="wk-next" aria-label="Volgende week">›</button></div>
+    ${S.dl && window.XLSX && rows.length ? `<button class="btn primary" data-a="xl-alle">Excel alle werven</button>` : ''}</div>
+  <section class="panel">
+    <div class="head"><div><h2>${weekLabel(m)}</h2><div class="small muted">${klaar} van ${rows.length} werven doorgestuurd · ${hm(tot)} u in totaal</div></div></div>
+    ${!S.weekLoaded ? `<div class="empty">Uren laden…</div>` : rows.length ? `
+    <div class="tscroll"><table>
+      <thead><tr><th>Werf</th><th>Status</th><th>Personen</th><th>Uren</th><th></th></tr></thead>
+      <tbody>${rows.map(x => `<tr><td>${esc(x.w.naam)}</td><td>${x.ws.html}</td><td>${x.wd.personen.length}</td><td class="wk">${hm(x.wd.tot)}</td>
+        <td>${S.dl && window.XLSX ? `<button class="btn ghost" data-a="xl-een" data-w="${esc(x.w.id)}">Excel</button>` : ''}</td></tr>`).join('')}</tbody>
+    </table></div>` : `<div class="empty"><strong>Nog niets ingevuld deze week</strong>Zodra een werfleider uren invult, verschijnt de werf hier.</div>`}
+  </section>
+  ${viewBackups(m)}`;
+}
+
+function viewBackups(m){
+  const xl = S.dl && window.XLSX;
+  return `<section class="panel">
+    <div class="head"><div><h2>Back-ups</h2><div class="small muted">Bij elke keer doorsturen wordt de week van die werf vastgelegd. Back-ups worden nooit overschreven.</div></div></div>
+    ${S.backups.length ? `<div class="tscroll"><table>
+      <thead><tr><th>Werf</th><th>Bewaard op</th><th>Soort</th><th>Uren</th><th></th></tr></thead>
+      <tbody>${S.backups.map(bk => { const wd = weekData(bk.werf, m, bk.dagen || {}); const t = new Date(bk.gemaaktOp);
+        const conf = S.confirmRestore === bk.id;
+        return `<tr><td>${esc(werf(bk.werf)?.naam || bk.werfNaam)}</td><td>${kort(iso(t))} ${pad(t.getHours())}:${pad(t.getMinutes())}</td>
+          <td><span class="pill ${bk.soort === 'voor-terugzetten' ? '' : 'ok'}">${bk.soort === 'voor-terugzetten' ? 'Vóór terugzetten' : 'Doorgestuurd'}</span></td>
+          <td class="wk">${hm(wd.tot)}</td>
+          <td>${xl ? `<button class="btn ghost" data-a="xl-bk" data-id="${esc(bk.id)}">Excel</button>` : ''}
+            ${S.canWrite ? `<button class="btn ${conf ? 'primary' : 'ghost'}" data-a="bk-terug" data-id="${esc(bk.id)}">${conf ? 'Zeker? Terugzetten' : 'Terugzetten'}</button>` : ''}</td></tr>`; }).join('')}</tbody>
+    </table></div>
+    <p class="small muted">Terugzetten vervangt de uren van die werf en week door de back-up. De huidige uren worden eerst zelf als back-up bewaard.</p>`
+    : `<div class="empty"><strong>Nog geen back-ups deze week</strong>Zodra een werfleider een week doorstuurt, verschijnt hier een kopie.</div>`}
+  </section>`;
+}
+
+function weekSnapshot(wid, m){
+  const dagen = {};
+  for(let i=0; i<7; i++){ const k = dagKey(wid, addDays(m,i)); const d = S.dagen[k]; if(d?.rijen?.length) dagen[k] = { datum: d.datum, rijen: structuredClone(d.rijen) }; }
+  return dagen;
+}
+async function maakBackup(wid, m, soort){
+  const nu = new Date().toISOString();
+  await S.db.doc(`backups/${wid}_${m}_${Date.now()}`).set({ werf:wid, werfNaam: werf(wid)?.naam || '', maandag:m, gemaaktOp:nu, soort, door:S.myId || null, dagen: weekSnapshot(wid, m) });
+  return nu;
+}
+async function terugzetten(bk){
+  const m = bk.maandag, wid = bk.werf;
+  await maakBackup(wid, m, 'voor-terugzetten');
+  const oud = bk.gemaaktOp;
+  for(let i=0; i<7; i++){ const datum = addDays(m,i); const k = dagKey(wid, datum); const src = bk.dagen?.[k];
+    if(src?.rijen?.length) await S.db.doc('dagen/'+k).set({ werf:wid, datum, rijen: structuredClone(src.rijen), bijgewerkt: oud, door: S.myId || null });
+    else if(S.dagen[k]) await S.db.doc('dagen/'+k).delete(); }
+  await S.db.doc('weken/' + weekDocKey(wid, m)).set({ werf:wid, maandag:m, ingediend:true, ingediendOp: new Date().toISOString(), door:S.myId || null, teruggezet: oud });
+}
+
+function viewBeheer(){
+  const ws = [...S.werven].sort((a,b) => (a.actief===false) - (b.actief===false) || a.naam.localeCompare(b.naam,'nl'));
+  const ps = [...S.personen].sort((a,b) => (a.actief===false) - (b.actief===false) || a.naam.localeCompare(b.naam,'nl'));
+  const dis = S.canWrite ? '' : 'disabled';
+  const lijst = (arr, col) => arr.map(x => `<div class="li ${x.actief===false?'off':''}"><input id="${col}-${esc(x.id)}" data-col="${col}" data-id="${esc(x.id)}" value="${esc(x.naam)}" aria-label="Naam" ${dis}>
+      <button class="btn ghost" data-a="toggle" data-col="${col}" data-id="${esc(x.id)}" ${dis}>${x.actief===false?'Terugzetten':'Archiveren'}</button></div>`).join('');
+  return `<div class="grid2">
+  <section class="panel"><div class="head"><h2>Werven</h2><span class="small muted">${actieveWerven().length} actief</span></div>
+    <div class="list">
+      <label class="lbl small muted" for="mailStd">Uren standaard mailen naar</label>
+      <input type="email" id="mailStd" value="${esc(S.instellingen.email)}" placeholder="bv. boekhouding@jullie-bedrijf.be" ${dis}>
+    </div>
+    <div class="list" style="margin-top:12px">${ws.map(w => { const ploeg = ploegVan(w.id); const ids = new Set(w.ploeg||[]);
+      const rest = S.personen.filter(p => p.actief !== false && !ids.has(p.id)).sort((a,b)=>a.naam.localeCompare(b.naam,'nl'));
+      return `<div class="werfblok ${w.actief===false?'off':''}">
+        <div class="li"><input id="werven-${esc(w.id)}" data-col="werven" data-id="${esc(w.id)}" value="${esc(w.naam)}" aria-label="Naam werf" ${dis}>
+          <button class="btn ghost" data-a="toggle" data-col="werven" data-id="${esc(w.id)}" ${dis}>${w.actief===false?'Terugzetten':'Archiveren'}</button></div>
+        <label class="lbl" for="mail-${esc(w.id)}">E-mail voor deze werf (leeg = standaardadres)</label>
+        <input type="email" id="mail-${esc(w.id)}" data-mail="${esc(w.id)}" value="${esc(w.email)}" placeholder="${esc(S.instellingen.email || 'zelfde als standaard')}" ${dis}>
+        <span class="lbl">Ploeg (${ploeg.length})</span>
+        <div class="chips">${ploeg.map(p => `<span class="chip">${esc(p.naam)}${S.canWrite ? `<button data-a="ploeg-weg" data-w="${esc(w.id)}" data-p="${esc(p.id)}" aria-label="${esc(p.naam)} uit ploeg halen">×</button>` : ''}</span>`).join('') || '<span class="small muted">Nog niemand. Wie je op een dag invult, komt automatisch in de ploeg.</span>'}</div>
+        ${S.canWrite && rest.length ? `<select id="ploeg-${esc(w.id)}" data-ploeg="${esc(w.id)}" aria-label="Persoon aan ploeg toevoegen"><option value="">+ Aan ploeg toevoegen…</option>${rest.map(p => `<option value="${esc(p.id)}">${esc(p.naam)}</option>`).join('')}</select>` : ''}
+      </div>`; }).join('') || '<p class="muted">Nog geen werven.</p>'}</div>
+    ${S.canWrite ? `<div class="add"><input id="nwWerf" placeholder="Nieuwe werf"><button class="btn primary" data-a="werf-add">Toevoegen</button></div>` : ''}</section>
+  <section class="panel"><div class="head"><h2>Personen</h2><span class="small muted">${S.personen.filter(p=>p.actief!==false).length} actief</span></div>
+    <div class="list">${lijst(ps,'personen') || '<p class="muted">Personen worden ook automatisch toegevoegd wanneer je een nieuwe naam intypt op het tabblad Dag.</p>'}</div>
+    ${S.canWrite ? `<div class="add"><input id="nwPersB" placeholder="Nieuwe persoon"><button class="btn primary" data-a="pers-addB">Toevoegen</button></div>` : ''}</section>
+  </div>
+  <p class="small muted">Gearchiveerde werven en personen verdwijnen uit de keuzelijsten, maar hun uren blijven bewaard.</p>
+  ${S.local ? `<section class="panel"><div class="head"><h2>Gegevens op dit toestel</h2></div>
+    <p class="small muted">Alle uren staan alleen op deze gsm of pc, in deze browser. Download geregeld een back-upbestand, zeker voor je de browsergeschiedenis wist of van toestel wisselt. Met dat bestand zet je alles terug, ook op een ander toestel.</p>
+    <div class="tools"><button class="btn" data-a="exp-json">Back-upbestand downloaden</button>
+      <label class="btn" for="impJson">Back-upbestand terugzetten</label><input type="file" id="impJson" accept=".json,application/json" hidden></div>
+    ${S.confirmImport ? `<div class="banner">Dit vervangt alle gegevens op dit toestel door die uit het bestand. <button class="btn primary" data-a="imp-ok">Ja, terugzetten</button> <button class="btn ghost" data-a="imp-nee">Annuleren</button></div>` : ''}
+  </section>` : ''}`;
+}
+
+async function resolveNames(){
+  if(!S.user) return;
+  const ids = [...new Set(Object.values(S.weken).map(w => w.door).filter(Boolean))].filter(id => !(id in S.names));
+  if(!ids.length) return;
+  try{ const ps = await S.user.profiles(ids); ids.forEach(id => S.names[id] = ps?.[id]?.name || ''); }catch{}
+}
+
+// ---- acties ----
+async function ensurePersoon(naam){
+  naam = naam.trim().replace(/\s+/g,' '); if(!naam) return null;
+  const f = S.personen.find(p => p.naam.toLowerCase() === naam.toLowerCase());
+  if(f){ if(f.actief === false) await S.db.doc('personen/'+f.id).update({actief:true}); return f; }
+  const ref = S.db.collection('personen').doc(); const p = { naam, actief:true };
+  await ref.set(p); const n = { id: ref.id, ...p }; S.personen.push(n); return n;
+}
+const ploegVan = wid => (werf(wid)?.ploeg || []).map(id => S.personen.find(p => p.id === id)).filter(p => p && p.actief !== false).sort((a,b)=>a.naam.localeCompare(b.naam,'nl'));
+async function inPloeg(wid, pid){ const w = werf(wid); if(!w || (w.ploeg||[]).includes(pid)) return;
+  const ploeg = [...(w.ploeg||[]), pid]; w.ploeg = ploeg; try{ await S.db.doc('werven/'+wid).update({ ploeg }); }catch{} }
+async function uitPloeg(wid, pid){ const w = werf(wid); if(!w) return; const ploeg = (w.ploeg||[]).filter(x => x !== pid); w.ploeg = ploeg;
+  try{ await S.db.doc('werven/'+wid).update({ ploeg }); }catch{ toast('Dat lukte niet.'); } }
+const mailAdres = wid => (werf(wid)?.email || S.instellingen.email || '').trim();
+async function voegToe(p){ if(!p) return; if(S.rows.some(r => r.pid === p.id)){ toast(`${p.naam} staat al op deze dag.`); return; }
+  S.rows.push(nieuweRij(p)); markDirty(); inPloeg(S.werfId, p.id); render(); }
+const nieuweRij = p => ({ pid:p.id, naam:p.naam, start:S.std.start, stop:S.std.stop, pauze:S.std.pauze, opm:'' });
+
+async function kopieerVorige(){
+  try{
+    const s = await S.db.collection('dagen').where('werf','==',S.werfId).where('datum','<',S.datum).orderBy('datum','desc').limit(1).get();
+    if(s.empty){ toast('Geen eerdere dag gevonden voor deze werf.'); return; }
+    const src = s.docs[0].data();
+    S.rows = structuredClone(src.rijen || []).map(r => ({ ...r, opm:'' }));
+    toast(`Ploeg van ${DAGEN_LANG[dagIdx(src.datum)]} ${kort(src.datum)} gekopieerd.`);
+    markDirty(); render();
+  }catch(e){ toast('Kopiëren lukte niet. Probeer opnieuw.'); }
+}
+
+async function xlsxSave(werfIds, m, src = S.dagen, suffix = ''){
+  const wb = XLSX.utils.book_new();
+  const dagen = [...Array(7)].map((_,i) => addDays(m,i));
+  const totalen = [['Werf','Persoon', ...dagen.map((d,i) => `${DAGEN[i]} ${kort(d)}`), 'Totaal uren']];
+  const detail = [['Werf','Week','Datum','Dag','Persoon','Start','Stop','Pauze (min)','Uren','Opmerking']];
+  werfIds.forEach(wid => {
+    const w = werf(wid) || { naam: src === S.dagen ? '' : (S.backups.find(b => b.werf === wid)?.werfNaam || '') }; const wd = weekData(wid, m, src);
+    wd.personen.forEach(p => {
+      totalen.push([w.naam, p.naam, ...p.min.map(x => x ? dec(x) : null), dec(p.min.reduce((a,b)=>a+b,0))]);
+      p.rijen.sort((a,b) => a.datum.localeCompare(b.datum)).forEach(r => detail.push([w.naam, isoWeek(m).w, xlDate(r.datum), DAGEN_LANG[dagIdx(r.datum)], r.naam, r.start||'', r.stop||'', Number(r.pauze)||0, dec(r.min), r.opm||'']));
+    });
+    totalen.push([w.naam, 'Totaal werf', ...wd.dagTot.map(x => x ? dec(x) : null), dec(wd.tot)]);
+  });
+  const kop = detail.shift(); detail.sort((x,y) => x[0].localeCompare(y[0],'nl') || x[2] - y[2] || x[4].localeCompare(y[4],'nl')); detail.unshift(kop);
+  const t = XLSX.utils.aoa_to_sheet(totalen); t['!cols'] = [{wch:28},{wch:24}, ...dagen.map(()=>({wch:10})), {wch:12}];
+  const d = XLSX.utils.aoa_to_sheet(detail); d['!cols'] = [{wch:28},{wch:6},{wch:11},{wch:10},{wch:24},{wch:7},{wch:7},{wch:11},{wch:7},{wch:30}];
+  const fmt = (ws, col, z) => { const r = XLSX.utils.decode_range(ws['!ref']);
+    for(let R=1; R<=r.e.r; R++){ const c = ws[XLSX.utils.encode_cell({r:R,c:col})]; if(c && c.t === 'n') c.z = z; } };
+  for(let C=2; C<=8; C++) fmt(t, C, '0.00');
+  fmt(d, 2, 'dd/mm/yyyy'); fmt(d, 8, '0.00');
+  XLSX.utils.book_append_sheet(wb, d, 'Uren per dag');
+  XLSX.utils.book_append_sheet(wb, t, 'Totalen');
+  const buf = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+  const naam = werfIds.length === 1 ? (werf(werfIds[0])?.naam || 'werf').replace(/[^\p{L}\p{N}]+/gu,'-').replace(/^-|-$/g,'') : 'alle-werven';
+  try{ await S.dl.save({ filename:`Uren_${naam}_${weekCode(m)}${suffix}.xlsx`, data: new Blob([buf]) }); toast('Excel-bestand bewaard.'); }
+  catch(e){ if(e?.code !== 'declined') toast('Downloaden lukte niet in deze weergave.'); }
+}
+
+document.addEventListener('click', async ev => {
+  const tab = ev.target.closest('#tabs button');
+  if(tab){ await flush(); S.view = tab.dataset.v; ls.set('view', S.view); syncRows(); render(); return; }
+  const b = ev.target.closest('[data-a]'); if(!b || b.disabled) return;
+  const a = b.dataset.a;
+  if(a === 'dag-prev') return navigate(() => S.datum = addDays(S.datum,-1));
+  if(a === 'dag-next') return navigate(() => S.datum = addDays(S.datum,1));
+  if(a === 'dag-today') return navigate(() => S.datum = vandaag());
+  if(a === 'wk-prev') return navigate(() => S.datum = addDays(S.datum,-7));
+  if(a === 'wk-next') return navigate(() => S.datum = addDays(S.datum,7));
+  if(a === 'kopieer') return kopieerVorige();
+  if(a === 'rij-weg'){ const i = +b.closest('.row').dataset.i; S.rows.splice(i,1); markDirty(); render(); return; }
+  if(a === 'pers-add'){ const inp = $('#nwPers'); const p = await ensurePersoon(inp.value); if(!p) return;
+    S.nieuwNaam = false; await voegToe(p); return; }
+  if(a === 'allen'){ const opDag = new Set(S.rows.map(r => r.pid));
+    ploegVan(S.werfId).filter(p => !opDag.has(p.id)).forEach(p => S.rows.push(nieuweRij(p)));
+    markDirty(); render(); return; }
+  if(a === 'ploeg-weg'){ return uitPloeg(b.dataset.w, b.dataset.p).then(render); }
+  if(a === 'exp-json'){ const blob = new Blob([JSON.stringify({ app:'werfuren', versie:1, gemaakt:new Date().toISOString(), data:S.db.exportAll() }, null, 1)], { type:'application/json' });
+    await S.dl.save({ filename:`Werfuren-backup-${vandaag()}.json`, data: blob }); toast('Back-upbestand gedownload.'); return; }
+  if(a === 'imp-ok'){ S.db.importAll(S.confirmImport); S.confirmImport = null; S.weekKey = null; subWeek(); toast('Gegevens teruggezet.'); render(); return; }
+  if(a === 'imp-nee'){ S.confirmImport = null; render(); return; }
+  if(a === 'mail-open'){ S.mailOpen = !S.mailOpen; render(); return; }
+  if(a === 'kopieer-tekst'){ const el = document.getElementById(b.dataset.t); const txt = el?.textContent || '';
+    try{ await navigator.clipboard.writeText(txt); toast('Gekopieerd.'); }
+    catch{ const r = document.createRange(); r.selectNodeContents(el); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast('Tekst geselecteerd. Kopieer met Ctrl+C of lang drukken.'); }
+    return; }
+  if(a === 'std-all'){ S.rows.forEach(r => { r.start = S.std.start; r.stop = S.std.stop; r.pauze = S.std.pauze; }); markDirty(); render(); return; }
+  if(a === 'indienen' || a === 'heropen'){
+    await flush(); const m = maandag(S.datum);
+    try{ if(a === 'indienen') await maakBackup(S.werfId, m, 'doorgestuurd');
+      await S.db.doc('weken/' + weekDocKey(S.werfId, m)).set(a === 'indienen'
+        ? { werf:S.werfId, maandag:m, ingediend:true, ingediendOp:new Date().toISOString(), door:S.myId || null }
+        : { werf:S.werfId, maandag:m, ingediend:false });
+      if(a === 'indienen') S.mailOpen = true;
+      toast(a === 'indienen' ? 'Week doorgestuurd naar kantoor.' : 'Week heropend.'); }
+    catch{ toast('Dat lukte niet. Probeer opnieuw.'); }
+    return; }
+  if(a === 'xl-bk'){ const bk = S.backups.find(x => x.id === b.dataset.id); if(!bk) return; const t = new Date(bk.gemaaktOp);
+    return xlsxSave([bk.werf], bk.maandag, bk.dagen || {}, `_backup-${iso(t)}-${pad(t.getHours())}${pad(t.getMinutes())}`); }
+  if(a === 'bk-terug'){ const bk = S.backups.find(x => x.id === b.dataset.id); if(!bk) return;
+    if(S.confirmRestore !== bk.id){ S.confirmRestore = bk.id; render(); return; }
+    S.confirmRestore = null; b.disabled = true;
+    try{ await terugzetten(bk); toast('Back-up teruggezet.'); }catch{ toast('Terugzetten lukte niet. Probeer opnieuw.'); render(); }
+    return; }
+  if(a === 'xl-werf') return xlsxSave([S.werfId], maandag(S.datum));
+  if(a === 'xl-een') return xlsxSave([b.dataset.w], maandag(S.datum));
+  if(a === 'xl-alle'){ const m = maandag(S.datum); return xlsxSave(actieveWerven().filter(w => weekData(w.id,m).tot).map(w => w.id), m); }
+  if(a === 'werf-add' || a === 'werf-add0'){ const inp = $(a === 'werf-add' ? '#nwWerf' : '#nwWerf0'); const naam = inp.value.trim(); if(!naam) return;
+    const ref = S.db.collection('werven').doc(); try{ await ref.set({ naam, actief:true }); S.werfId = ref.id; ls.set('werf', ref.id); inp.value=''; toast(`Werf "${naam}" toegevoegd.`); }catch{ toast('Toevoegen lukte niet.'); } return; }
+  if(a === 'pers-addB'){ const inp = $('#nwPersB'); const p = await ensurePersoon(inp.value); if(p){ inp.value=''; toast(`${p.naam} toegevoegd.`); render(); } return; }
+  if(a === 'toggle'){ const col = b.dataset.col, id = b.dataset.id; const x = (col==='werven'?S.werven:S.personen).find(y => y.id===id);
+    try{ await S.db.doc(`${col}/${id}`).update({ actief: x.actief === false }); }catch{ toast('Dat lukte niet.'); } return; }
+});
+
+document.addEventListener('input', ev => {
+  const t = ev.target; const row = t.closest('.row[data-i]');
+  if(row && t.dataset.f){ const i = +row.dataset.i; const r = S.rows[i]; if(!r) return;
+    r[t.dataset.f] = t.dataset.f === 'pauze' ? Number(t.value) : t.value;
+    const u = document.querySelector(`[data-u="${i}"]`); if(u) u.textContent = hm(werkMin(r));
+    const tot = $('#dagTot'); if(tot) tot.textContent = hm(S.rows.reduce((a,x)=>a+werkMin(x),0)) + ' u';
+    markDirty(); }
+});
+document.addEventListener('change', async ev => {
+  const t = ev.target;
+  if(t.id === 'werfSel') return navigate(() => { S.werfId = t.value; S.mailOpen = false; });
+  if(t.id === 'impJson' && t.files?.[0]){ try{ const j = JSON.parse(await t.files[0].text()); if(j?.app !== 'werfuren' || typeof j.data !== 'object') throw 0;
+      S.confirmImport = j.data; render(); }catch{ toast('Dit is geen geldig Werfuren-back-upbestand.'); } t.value = ''; return; }
+  if(t.id === 'persSel'){ const v = t.value; if(!v) return;
+    if(v === '__nieuw'){ S.nieuwNaam = true; render(); $('#nwPers')?.focus(); return; }
+    return voegToe(S.personen.find(p => p.id === v)); }
+  if(t.dataset.ploeg){ const pid = t.value; if(!pid) return; await inPloeg(t.dataset.ploeg, pid); render(); return; }
+  if(t.id === 'mailStd'){ const email = t.value.trim();
+    try{ await S.db.doc('instellingen/algemeen').set({ ...S.instellingen, email }); toast('E-mailadres bewaard.'); }catch{ toast('Opslaan lukte niet.'); } return; }
+  if(t.dataset.mail){ const email = t.value.trim();
+    try{ await S.db.doc('werven/'+t.dataset.mail).update({ email }); toast('E-mailadres bewaard.'); }catch{ toast('Opslaan lukte niet.'); } return; }
+  if(t.id === 'datum' && t.value) return navigate(() => S.datum = t.value);
+  if(['stdS','stdE','stdP'].includes(t.id)){ S.std = { start: $('#stdS').value || '07:30', stop: $('#stdE').value || '16:00', pauze: Number($('#stdP').value) }; ls.set('std', S.std); return; }
+  if(t.dataset.col && t.dataset.id && t.dataset.f !== 'x'){ const naam = t.value.trim(); if(!naam) return render();
+    try{ await S.db.doc(`${t.dataset.col}/${t.dataset.id}`).update({ naam }); toast('Naam aangepast.'); }catch{ toast('Opslaan lukte niet.'); } }
+});
+document.addEventListener('keydown', ev => {
+  if(ev.key !== 'Enter') return;
+  const map = { nwPers:'pers-add', nwWerf:'werf-add', nwWerf0:'werf-add0', nwPersB:'pers-addB' };
+  if(map[ev.target.id]){ ev.preventDefault(); document.querySelector(`[data-a="${map[ev.target.id]}"]`)?.click(); }
+});
+
+render();
+boot();
+})();
+</script>
+
+<script>if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});</script>
+</body>
+</html>
