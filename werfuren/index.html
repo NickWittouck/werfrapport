@@ -16,7 +16,7 @@
 <title>Werfuren</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="exceljs.min.js"></script>
 <style>
 /* Layout: één kolom-werkblad, sticky werkbalk (werf + datum), registratie als rijen die op gsm stapelen */
 :root{
@@ -147,7 +147,7 @@ td.wk{font-weight:700}
 
 <script>
 (() => {
-const VERSIE = '10 okt 2026 · 3';
+const VERSIE = '10 okt 2026 · 4';
 const DAGEN = ['ma','di','wo','do','vr','za','zo'];
 const DAGEN_LANG = ['maandag','dinsdag','woensdag','donderdag','vrijdag','zaterdag','zondag'];
 const MAAND = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
@@ -332,7 +332,7 @@ function render(){
   app.innerHTML = html;
   const nf = f && document.getElementById(f);
   if(nf){ nf.focus(); try{ if(sel) nf.setSelectionRange(sel[0], sel[1]); }catch{} }
-  paintSaved(); resolveNames();
+  paintSaved(); resolveNames(); bereidXlsx();
 }
 
 function werfSelect(){ return `<select id="werfSel" aria-label="Werf">${actieveWerven().map(w => `<option value="${esc(w.id)}" ${w.id===S.werfId?'selected':''}>${esc(w.naam)}</option>`).join('')}</select>`; }
@@ -424,7 +424,7 @@ function viewWeek(){
   <section class="panel">
     <div class="head"><div><h2>${weekLabel(m)}</h2><div class="small muted">${esc(werf(S.werfId)?.naam)} ${ws.html}</div></div>
       <div class="tools">
-        ${S.dl && window.XLSX ? `<button class="btn" data-a="xl-werf">Excel downloaden</button>` : ''}
+        ${S.dl && window.ExcelJS ? `<button class="btn" data-a="xl-werf">Excel downloaden</button>` : ''}
         ${ws.st ? `<button class="btn" data-a="mail-open">${S.mailOpen ? 'Mail verbergen' : 'Mail opstellen'}</button>` : ''}
         ${S.canWrite ? (ws.st && !ws.later ? `<button class="btn ghost" data-a="heropen">Heropenen</button>` : `<button class="btn primary" data-a="indienen" ${wd.tot?'':'disabled'}>${ws.later ? 'Opnieuw doorsturen' : 'Week doorsturen naar kantoor'}</button>`) : ''}
       </div></div>
@@ -450,7 +450,7 @@ function mailInfo(wid, m, wd){
 }
 function b64(buf){ const u = new Uint8Array(buf); let bin = ''; for(let i=0; i<u.length; i+=0x8000) bin += String.fromCharCode.apply(null, u.subarray(i, i+0x8000)); return btoa(bin); }
 async function verstuurAuto(wid, m){
-  const info = mailInfo(wid, m, weekData(wid, m)); const { filename, buf } = maakXlsx([wid], m);
+  const info = mailInfo(wid, m, weekData(wid, m)); const { filename, buf } = await maakXlsx([wid], m);
   toast('Mail wordt verstuurd…');
   try{
     const r = await fetch(S.instellingen.scriptUrl, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
@@ -462,7 +462,7 @@ async function verstuurAuto(wid, m){
   }catch(e){ console.warn(e); S.mailOpen = true; toast('Automatisch mailen lukte niet. Verstuur de mail hieronder zelf.'); }
   render();
 }
-const kanDelen = () => { try{ return !!(S.local && navigator.canShare && window.XLSX && navigator.canShare({ files:[ new File(['x'], 't.xlsx', { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }) ] })); }catch{ return false; } };
+const kanDelen = () => { try{ return !!(S.local && navigator.canShare && window.ExcelJS && navigator.canShare({ files:[ new File(['x'], 't.xlsx', { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }) ] })); }catch{ return false; } };
 function mailPaneel(wid, m, wd){
   const adres = mailAdres(wid); const naam = werf(wid)?.naam || '';
   const onderwerp = `Uren ${naam} – week ${isoWeek(m).w} (${kort(m)} – ${kort(addDays(m,6))})`;
@@ -478,10 +478,10 @@ function mailPaneel(wid, m, wd){
     <div class="tools"><span class="adres" id="mailAdres">${esc(adres)}</span><button class="btn ghost" data-a="kopieer-tekst" data-t="mailAdres">Kopieer adres</button></div>
     <div class="small muted">Onderwerp</div><pre id="mailOnd">${esc(onderwerp)}</pre>
     <div class="small muted">Tekst</div><pre id="mailTxt">${esc(tekst)}</pre>
-    ${S.local && window.XLSX ? `<div class="tools"><button class="btn primary" data-a="deel">Mailen met Excel als bijlage</button></div>
+    ${S.local && window.ExcelJS ? `<div class="tools"><button class="btn primary" data-a="deel">Mailen met Excel als bijlage</button></div>
     <div class="small muted">${kanDelen() ? 'Kies je mail-app (Outlook, Gmail, Mail). De Excel en de tekst staan er al in. Vul bij "Aan" het adres hierboven in en verstuur. Tik eerst op "Kopieer adres" om het te kunnen plakken.' : 'Deze browser kan geen bijlage doorgeven aan je mail-app. De Excel wordt gedownload en je mail opent: voeg het bestand daar zelf toe. Op gsm lukt het wel met Chrome (Android) of Safari (iPhone).'}</div>` : `
     <div class="tools">
-      ${S.dl && window.XLSX ? `<button class="btn" data-a="xl-werf">1. Excel downloaden</button>` : ''}
+      ${S.dl && window.ExcelJS ? `<button class="btn" data-a="xl-werf">1. Excel downloaden</button>` : ''}
       <a class="btn primary" href="${esc(mailto)}" ${S.local ? '' : 'target="_blank" rel="noopener"'}>2. Mail openen</a>
       <button class="btn ghost" data-a="kopieer-tekst" data-t="mailTxt">Kopieer tekst</button>
     </div>
@@ -500,21 +500,21 @@ function viewKantoor(){
   <div class="bar"><div class="datenav"><button class="btn sq" data-a="wk-prev" aria-label="Vorige week">‹</button>
       <input type="date" id="datum" value="${S.datum}" aria-label="Dag in de week">
       <button class="btn sq" data-a="wk-next" aria-label="Volgende week">›</button></div>
-    ${S.dl && window.XLSX && rows.length ? `<button class="btn primary" data-a="xl-alle">Excel alle werven</button>` : ''}</div>
+    ${S.dl && window.ExcelJS && rows.length ? `<button class="btn primary" data-a="xl-alle">Excel alle werven</button>` : ''}</div>
   <section class="panel">
     <div class="head"><div><h2>${weekLabel(m)}</h2><div class="small muted">${klaar} van ${rows.length} werven doorgestuurd · ${hm(tot)} u in totaal</div></div></div>
     ${!S.weekLoaded ? `<div class="empty">Uren laden…</div>` : rows.length ? `
     <div class="tscroll"><table>
       <thead><tr><th>Werf</th><th>Status</th><th>Personen</th><th>Uren</th><th></th></tr></thead>
       <tbody>${rows.map(x => `<tr><td>${esc(x.w.naam)}</td><td>${x.ws.html}</td><td>${x.wd.personen.length}</td><td class="wk">${hm(x.wd.tot)}</td>
-        <td>${S.dl && window.XLSX ? `<button class="btn ghost" data-a="xl-een" data-w="${esc(x.w.id)}">Excel</button>` : ''}</td></tr>`).join('')}</tbody>
+        <td>${S.dl && window.ExcelJS ? `<button class="btn ghost" data-a="xl-een" data-w="${esc(x.w.id)}">Excel</button>` : ''}</td></tr>`).join('')}</tbody>
     </table></div>` : `<div class="empty"><strong>Nog niets ingevuld deze week</strong>Zodra een werfleider uren invult, verschijnt de werf hier.</div>`}
   </section>
   ${viewBackups(m)}`;
 }
 
 function viewBackups(m){
-  const xl = S.dl && window.XLSX;
+  const xl = S.dl && window.ExcelJS;
   return `<section class="panel">
     <div class="head"><div><h2>Back-ups</h2><div class="small muted">Bij elke keer doorsturen wordt de week van die werf vastgelegd. Back-ups worden nooit overschreven.</div></div></div>
     ${S.backups.length ? `<div class="tscroll"><table>
@@ -627,36 +627,117 @@ async function kopieerVorige(){
   }catch(e){ toast('Kopiëren lukte niet. Probeer opnieuw.'); }
 }
 
-function maakXlsx(werfIds, m, src = S.dagen, suffix = ''){
-  const wb = XLSX.utils.book_new();
+async function maakXlsx(werfIds, m, src = S.dagen, suffix = ''){
+  const XL = window.ExcelJS;
+  const wb = new XL.Workbook(); wb.creator = 'Werfuren'; wb.created = new Date();
   const dagen = [...Array(7)].map((_,i) => addDays(m,i));
-  const totalen = [['Werf','Persoon', ...dagen.map((d,i) => `${DAGEN[i]} ${kort(d)}`), 'Totaal uren']];
-  const detail = [['Werf','Week','Datum','Dag','Persoon','Start','Stop','Pauze (min)','Uren','Opmerking']];
-  werfIds.forEach(wid => {
-    const w = werf(wid) || { naam: src === S.dagen ? '' : (S.backups.find(b => b.werf === wid)?.werfNaam || '') }; const wd = weekData(wid, m, src);
-    wd.personen.forEach(p => {
-      totalen.push([w.naam, p.naam, ...p.min.map(x => x ? dec(x) : null), dec(p.min.reduce((a,b)=>a+b,0))]);
-      p.rijen.sort((a,b) => a.datum.localeCompare(b.datum)).forEach(r => detail.push([w.naam, isoWeek(m).w, xlDate(r.datum), DAGEN_LANG[dagIdx(r.datum)], r.naam, r.start||'', r.stop||'', Number(r.pauze)||0, dec(r.min), r.opm||'']));
+  const meer = werfIds.length > 1;
+  const wNaam = wid => werf(wid)?.naam || S.backups.find(b => b.werf === wid)?.werfNaam || '';
+  const titel = meer ? 'Alle werven' : wNaam(werfIds[0]);
+  const periode = `Week ${isoWeek(m).w} · ${DAGEN_LANG[0]} ${kort(m)} – ${DAGEN_LANG[6]} ${kort(addDays(m,6))} ${parse(addDays(m,6)).getFullYear()}`;
+  const INK = 'FF1C2228', LIJN = 'FFD3D9DE', BAND = 'FFF2F4F6', ACC = 'FFF2B200';
+  const rand = { top:{style:'thin',color:{argb:LIJN}}, bottom:{style:'thin',color:{argb:LIJN}}, left:{style:'thin',color:{argb:LIJN}}, right:{style:'thin',color:{argb:LIJN}} };
+  const vul = argb => ({ type:'pattern', pattern:'solid', fgColor:{ argb } });
+  const kopRij = (ws, waarden) => { const r = ws.addRow(waarden); r.height = 22;
+    r.eachCell(c => { c.font = { bold:true, color:{argb:'FFFFFFFF'} }; c.fill = vul(INK); c.alignment = { vertical:'middle', horizontal: typeof c.value === 'string' && /^(Start|Stop|Pauze|Uren|Totaal|ma|di|wo|do|vr|za|zo)/.test(c.value) ? 'center' : 'left' }; c.border = rand; }); return r; };
+  const kopTitel = (ws, breedte) => {
+    ws.addRow([`Urenregistratie – ${titel}`]).font = { bold:true, size:16 };
+    ws.addRow([periode]).font = { size:11, color:{argb:'FF5B6670'} };
+    ws.addRow([`Gemaakt op ${kort(vandaag())} ${parse(vandaag()).getFullYear()} met Werfuren`]).font = { size:9, italic:true, color:{argb:'FF8A949C'} };
+    ws.addRow([]);
+    [1,2,3].forEach(i => ws.mergeCells(i, 1, i, breedte));
+  };
+  const zetup = (ws, kolommen) => { ws.columns = kolommen; ws.pageSetup = { orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0, paperSize:9, margins:{ left:0.4, right:0.4, top:0.5, bottom:0.5, header:0.3, footer:0.3 } };
+    ws.headerFooter.oddFooter = '&L' + titel + '&RPagina &P van &N'; };
+
+  // ---- Blad 1: uren per dag ----
+  const d = wb.addWorksheet('Uren per dag', { views:[{ state:'frozen', ySplit:5, showGridLines:false }] });
+  const kolD = [ ...(meer ? [{ key:'werf', width:26 }] : []), { key:'datum', width:12 }, { key:'dag', width:12 }, { key:'naam', width:26 },
+    { key:'start', width:9 }, { key:'stop', width:9 }, { key:'pauze', width:13 }, { key:'uren', width:10 }, { key:'opm', width:36 } ];
+  zetup(d, kolD); kopTitel(d, kolD.length);
+  kopRij(d, [ ...(meer ? ['Werf'] : []), 'Datum', 'Dag', 'Persoon', 'Start', 'Stop', 'Pauze (min)', 'Uren', 'Opmerking' ]);
+  const uK = kolD.findIndex(k => k.key === 'uren') + 1, uL = d.getColumn(uK).letter;
+  const dagTotCellen = [];
+  for(const wid of werfIds){
+    const wd = weekData(wid, m, src); const werfTotCellen = [];
+    if(meer){ const r = d.addRow([wNaam(wid)]); r.font = { bold:true, size:12 }; r.height = 20; }
+    dagen.forEach((dt, i) => {
+      const rijen = wd.personen.flatMap(p => p.rijen.filter(r => r.datum === dt)).sort((a,b) => a.naam.localeCompare(b.naam,'nl'));
+      if(!rijen.length) return;
+      const eerste = d.rowCount + 1;
+      rijen.forEach(r => {
+        const a = tmin(r.start), b = tmin(r.stop);
+        const row = d.addRow({ werf: wNaam(wid), datum: xlDate(dt), dag: DAGEN_LANG[i], naam: r.naam, start: a==null ? null : a/1440, stop: b==null ? null : b/1440,
+          pauze: Number(r.pauze)||0, uren: dec(r.min), opm: r.opm || null });
+        row.eachCell({ includeEmpty:true }, c => { c.border = rand; c.alignment = { vertical:'middle' }; });
+        row.getCell('datum').numFmt = 'dd/mm/yyyy'; row.getCell('datum').alignment = { horizontal:'left' };
+        ['start','stop'].forEach(k => { row.getCell(k).numFmt = 'hh:mm'; row.getCell(k).alignment = { horizontal:'center' }; });
+        row.getCell('pauze').alignment = { horizontal:'center' };
+        row.getCell('uren').numFmt = '0.00';
+      });
+      const laatste = d.rowCount;
+      const t = d.addRow({ naam: `Totaal ${DAGEN_LANG[i]}`, uren: { formula:`SUM(${uL}${eerste}:${uL}${laatste})`, result: dec(wd.dagTot[i]) } });
+      t.eachCell({ includeEmpty:true }, c => { c.fill = vul(BAND); c.font = { bold:true }; c.border = rand; });
+      t.getCell('uren').numFmt = '0.00';
+      werfTotCellen.push(`${uL}${t.number}`);
+      d.addRow([]);
     });
-    totalen.push([w.naam, 'Totaal werf', ...wd.dagTot.map(x => x ? dec(x) : null), dec(wd.tot)]);
-  });
-  const kop = detail.shift(); detail.sort((x,y) => x[0].localeCompare(y[0],'nl') || x[2] - y[2] || x[4].localeCompare(y[4],'nl')); detail.unshift(kop);
-  const t = XLSX.utils.aoa_to_sheet(totalen); t['!cols'] = [{wch:28},{wch:24}, ...dagen.map(()=>({wch:10})), {wch:12}];
-  const d = XLSX.utils.aoa_to_sheet(detail); d['!cols'] = [{wch:28},{wch:6},{wch:11},{wch:10},{wch:24},{wch:7},{wch:7},{wch:11},{wch:7},{wch:30}];
-  const fmt = (ws, col, z) => { const r = XLSX.utils.decode_range(ws['!ref']);
-    for(let R=1; R<=r.e.r; R++){ const c = ws[XLSX.utils.encode_cell({r:R,c:col})]; if(c && c.t === 'n') c.z = z; } };
-  for(let C=2; C<=8; C++) fmt(t, C, '0.00');
-  fmt(d, 2, 'dd/mm/yyyy'); fmt(d, 8, '0.00');
-  XLSX.utils.book_append_sheet(wb, d, 'Uren per dag');
-  XLSX.utils.book_append_sheet(wb, t, 'Totalen');
-  const buf = XLSX.write(wb, { bookType:'xlsx', type:'array' });
-  const naam = werfIds.length === 1 ? (werf(werfIds[0])?.naam || 'werf').replace(/[^\p{L}\p{N}]+/gu,'-').replace(/^-|-$/g,'') : 'alle-werven';
+    if(meer && werfTotCellen.length){
+      const t = d.addRow({ naam: `Totaal ${wNaam(wid)}`, uren: { formula: werfTotCellen.join('+'), result: dec(wd.tot) } });
+      t.eachCell({ includeEmpty:true }, c => { c.font = { bold:true }; c.border = { top:{style:'medium',color:{argb:INK}} }; });
+      t.getCell('uren').numFmt = '0.00'; d.addRow([]);
+    }
+    dagTotCellen.push(...werfTotCellen);
+  }
+  const totAlles = werfIds.reduce((a, wid) => a + weekData(wid, m, src).tot, 0);
+  const g = d.addRow({ naam: 'Totaal week', uren: { formula: dagTotCellen.length ? dagTotCellen.join('+') : '0', result: dec(totAlles) } });
+  g.height = 22; g.eachCell({ includeEmpty:true }, c => { c.fill = vul(ACC); c.font = { bold:true, size:12, color:{argb:INK} }; c.alignment = { vertical:'middle' }; });
+  g.getCell('uren').numFmt = '0.00';
+
+  // ---- Blad 2: totalen per persoon ----
+  const t = wb.addWorksheet('Totalen', { views:[{ state:'frozen', ySplit:5, showGridLines:false }] });
+  const kolT = [ ...(meer ? [{ key:'werf', width:26 }] : []), { key:'naam', width:26 }, ...dagen.map((_,i) => ({ key:'d'+i, width:10 })), { key:'tot', width:12 } ];
+  zetup(t, kolT); kopTitel(t, kolT.length);
+  kopRij(t, [ ...(meer ? ['Werf'] : []), 'Persoon', ...dagen.map((dt,i) => `${DAGEN[i]} ${kort(dt)}`), 'Totaal uren' ]);
+  const d0 = meer ? 3 : 2, col = n => t.getColumn(n).letter;
+  const eersteT = t.rowCount + 1;
+  for(const wid of werfIds){
+    const wd = weekData(wid, m, src);
+    wd.personen.forEach((p, idx) => {
+      const vals = {}; p.min.forEach((x,i) => vals['d'+i] = x ? dec(x) : null);
+      const row = t.addRow({ werf: wNaam(wid), naam: p.naam, ...vals });
+      row.getCell('tot').value = { formula:`SUM(${col(d0)}${row.number}:${col(d0+6)}${row.number})`, result: dec(p.min.reduce((a,b)=>a+b,0)) };
+      row.eachCell({ includeEmpty:true }, c => { c.border = rand; if(idx % 2) c.fill = vul('FFFAFBFC'); });
+      for(let i=0; i<7; i++){ row.getCell('d'+i).numFmt = '0.00'; row.getCell('d'+i).alignment = { horizontal:'center' }; }
+      row.getCell('tot').numFmt = '0.00'; row.getCell('tot').font = { bold:true }; row.getCell('tot').alignment = { horizontal:'center' };
+    });
+  }
+  const laatsteT = t.rowCount;
+  const sumCol = n => ({ formula: laatsteT >= eersteT ? `SUM(${col(n)}${eersteT}:${col(n)}${laatsteT})` : '0' });
+  const tr = t.addRow({ naam:'Totaal' });
+  for(let i=0; i<7; i++){ const tot = werfIds.reduce((a,wid) => a + weekData(wid,m,src).dagTot[i], 0); tr.getCell('d'+i).value = { ...sumCol(d0+i), result: dec(tot) }; tr.getCell('d'+i).numFmt = '0.00;-0.00;"–"'; tr.getCell('d'+i).alignment = { horizontal:'center' }; }
+  tr.getCell('tot').value = { ...sumCol(d0+7), result: dec(totAlles) }; tr.getCell('tot').numFmt = '0.00'; tr.getCell('tot').alignment = { horizontal:'center' };
+  tr.height = 22; tr.eachCell({ includeEmpty:true }, c => { c.fill = vul(ACC); c.font = { bold:true, size:12, color:{argb:INK} }; c.alignment = { ...(c.alignment||{}), vertical:'middle' }; });
+
+  wb.eachSheet(ws => ws.eachRow({ includeEmpty:true }, r => r.eachCell({ includeEmpty:true }, c => { c.font = { name:'Calibri', size:11, ...(c.font || {}) }; })));
+  const buf = await wb.xlsx.writeBuffer();
+  const naam = meer ? 'alle-werven' : (wNaam(werfIds[0]) || 'werf').replace(/[^\p{L}\p{N}]+/gu,'-').replace(/^-|-$/g,'');
   return { filename:`Uren_${naam}_${weekCode(m)}${suffix}.xlsx`, buf };
 }
 async function xlsxSave(werfIds, m, src = S.dagen, suffix = ''){
-  const { filename, buf } = maakXlsx(werfIds, m, src, suffix);
+  const { filename, buf } = await maakXlsx(werfIds, m, src, suffix);
   try{ await S.dl.save({ filename, data: new Blob([buf]) }); toast('Excel-bestand bewaard.'); }
   catch(e){ if(e?.code !== 'declined') toast('Downloaden lukte niet in deze weergave.'); }
+}
+// Op gsm moet delen meteen na de tik gebeuren: maak het bestand vooraf klaar.
+const xlKlaar = { key:null, data:null };
+function weekSleutel(wid, m){ return wid + m + JSON.stringify(dagenVan(wid, m)); }
+function dagenVan(wid, m){ return [...Array(7)].map((_,i) => S.dagen[dagKey(wid, addDays(m,i))]?.rijen || null); }
+async function bereidXlsx(){
+  if(!(S.view === 'week' && S.mailOpen && S.local && window.ExcelJS && S.werfId)) return;
+  const m = maandag(S.datum), key = weekSleutel(S.werfId, m); if(xlKlaar.key === key) return;
+  xlKlaar.key = key; xlKlaar.data = null;
+  try{ const r = await maakXlsx([S.werfId], m); if(xlKlaar.key === key) xlKlaar.data = r; }catch(e){ console.warn(e); }
 }
 
 document.addEventListener('click', async ev => {
@@ -683,7 +764,8 @@ document.addEventListener('click', async ev => {
   if(a === 'imp-nee'){ S.confirmImport = null; render(); return; }
   if(a === 'auto-mail'){ b.disabled = true; await flush(); return verstuurAuto(S.werfId, maandag(S.datum)); }
   if(a === 'deel'){ const m = maandag(S.datum); const info = mailInfo(S.werfId, m, weekData(S.werfId, m));
-    const { filename, buf } = maakXlsx([S.werfId], m);
+    const key = weekSleutel(S.werfId, m);
+    const { filename, buf } = xlKlaar.key === key && xlKlaar.data ? xlKlaar.data : await maakXlsx([S.werfId], m);
     const file = new File([buf], filename, { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     if(kanDelen()){
       try{ await navigator.share({ files:[file], title: info.onderwerp, text: info.tekst }); return; }
